@@ -1,0 +1,50 @@
+default_notification:
+  enabled: true
+  telegram:
+    enabled: false
+    bot_token: YOUR_TELEGRAM_BOT_TOKEN
+    chat_id: YOUR_TELEGRAM_CHAT_ID
+  feishu:
+    enabled: true
+    webhook: https://open.feishu.cn/open-apis/bot/v2/hook/2e9f09a8-4cec-4475-a6a8-4da61c4a874c
+tasks:
+- name: V2EX-热榜
+  url: https://www.v2ex.com/?tab=hot
+  frequency: 3m
+  rule: css:span.item_title > a
+  enabled: false
+  screenshot: false
+  notification_title: v2ex的
+  notification:
+    enabled: true
+    telegram:
+      enabled: false
+      bot_token: ''
+      chat_id: ''
+    feishu:
+      enabled: true
+      webhook: https://open.feishu.cn/open-apis/bot/v2/hook/1502988b-7bd9-4457-aab8-4386901eeb4f
+  notification_template: default
+  storage_strategy: file
+- name: 测试
+  url: https://www.time163.com/
+  frequency: 1m
+  rule: css:#beijing-time
+  enabled: true
+  screenshot: true
+  notification_title: null
+  notification: null
+  notification_template: default
+  storage_strategy: file
+notification_presets:
+  default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{\
+    \ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】**\
+    \ > {{ new_summary }} {% if screenshot_url %} ---\n**\U0001F5BC️ [查看快照]({{ screenshot_url\
+    \ }})** {% endif %}"
+  simple: '[监控] {{ task_name }} 发生内容变更，请及时查看。链接: {{ url }}'
+  card: '**📈 {{ task_name }} - 内容变更**
+
+    > {{ new_summary }}
+
+    --- - **监控页面**: [点击访问]({{ url }}) {% if screenshot_url %} - **页面快照**: [点击查看]({{
+    screenshot_url }}) {% endif %}'

@@ -1,0 +1,16 @@
+Sponsor Star topoteretes / cognee Memory for AI Agents in 5 lines of code Python 5,070 386 Built by 408 stars today
+Sponsor Star linsomniac / spotify_to_ytmusic Copy playlists and liked music from Spotify to YTMusic Python 3,456 252 Built by 53 stars today
+Star Shubhamsaboo / awesome-llm-apps Collection of awesome LLM apps with AI Agents and RAG using OpenAI, Anthropic, Gemini and opensource models. Python 34,101 3,892 Built by 337 stars today
+Star lllyasviel / Fooocus Focus on prompting and generating Python 45,300 7,104 Built by 26 stars today
+Sponsor Star blacklanternsecurity / bbot The recursive internet scanner for hackers. 🧡 Python 8,575 676 Built by 10 stars today
+Star hanxi / xiaomusic 使用小爱音箱播放音乐，音乐使用 yt-dlp 下载。 Python 4,110 463 Built by 72 stars today
+Star Comfy-Org / ComfyUI-Manager ComfyUI-Manager is an extension designed to enhance the usability of ComfyUI. It offers management functions to install, remove, disable, and enable various custom nodes of ComfyUI. Furthermore, this extension provides a hub feature and convenience functions to access a wide range of information within ComfyUI. Python 10,359 1,381 Built by 15 stars today
+Star public-apis / public-apis A collective list of free APIs Python 350,461 36,849 Built by 233 stars today
+Star paperless-ngx / paperless-ngx A community-supported supercharged version of paperless: scan, index and archive all your physical documents Python 28,027 1,643 Built by 45 stars today
+Star mealie-recipes / mealie Mealie is a self hosted recipe manager and meal planner with a RestAPI backend and a reactive frontend application built in Vue for a pleasant user experience for the whole family. Easily add recipes into your database by providing the url and mealie will automatically import the relevant data or add a family recipe with the UI editor Python 9,266 892 Built by 8 stars today
+Star jwohlwend / boltz Official repository for the Boltz biomolecular interaction models Python 2,141 351 Built by 53 stars today
+Star stanfordnlp / dspy DSPy: The framework for programming—not prompting—language models Python 25,219 1,948 Built by 148 stars today
+Star freqtrade / freqtrade Free, open source crypto trading bot Python 39,614 7,865 Built by 29 stars today
+Sponsor Star Asabeneh / 30-Days-Of-Python 30 days of Python programming challenge is a step-by-step guide to learn the Python programming language in 30 days. This challenge may take more than100 days, follow your own pace. These videos may help too: https://www.youtube.com/channel/UC7PNRuno1rzYPb1xLa4yktw Python 46,738 8,919 Built by 21 stars today
+Star spotDL / spotify-downloader Download your Spotify playlists and songs along with album art and metadata (from YouTube if a match is found). Python 20,230 1,803 Built by 12 stars today
+Star langchain-ai / langmem Python 703 84 Built by 60 stars today
