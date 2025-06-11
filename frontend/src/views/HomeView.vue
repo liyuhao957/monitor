@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { taskService, settingsService, type Task, type Notification } from '@/services/api';
+import { taskService, settingsService, type Task, type Notification, type RuleInfo } from '@/services/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { QuestionFilled } from '@element-plus/icons-vue';
 
@@ -10,6 +10,11 @@ const isLoading = ref(true);
 const dialogVisible = ref(false);
 const isEditMode = ref(false);
 const form = ref<Partial<Task>>({});
+
+// Rule selection state
+const rules = ref<RuleInfo[]>([]);
+const selectedRuleId = ref('css');
+const ruleValue = ref('');
 
 const notificationPresets = ref<Record<string, string>>({});
 const selectedPresetKey = ref('');
@@ -26,6 +31,15 @@ const fetchTasks = async () => {
     ElMessage.error('无法加载任务列表');
   } finally {
     isLoading.value = false;
+  }
+};
+
+const fetchRules = async () => {
+  try {
+    const response = await settingsService.getExtractionRules();
+    rules.value = response.data;
+  } catch (error) {
+    ElMessage.error('无法加载提取规则列表');
   }
 };
 
@@ -54,6 +68,10 @@ const openCreateDialog = () => {
       feishu: { enabled: false, webhook: '' }
     }
   };
+  // Reset rule fields for create
+  selectedRuleId.value = 'css';
+  ruleValue.value = '';
+
   // Set initial state for create
   selectedPresetKey.value = 'default';
   customTemplate.value = notificationPresets.value['default'] || '';
@@ -69,6 +87,25 @@ const openEditDialog = async (task: Task) => {
       feishu: { enabled: false, webhook: '' }
     }
   };
+
+  // --- Rule parsing logic ---
+  const ruleParts = (task.rule || 'css:').split(':');
+  const ruleType = ruleParts[0];
+  const currentRule = rules.value.find(r => r.id === ruleType);
+
+  if (currentRule) {
+    selectedRuleId.value = currentRule.id;
+    if (currentRule.needs_value) {
+      ruleValue.value = ruleParts.slice(1).join(':');
+    } else {
+      ruleValue.value = '';
+    }
+  } else {
+    // Fallback for unknown rule
+    selectedRuleId.value = 'css';
+    ruleValue.value = task.rule || '';
+  }
+  // --- End of rule parsing ---
 
   // Ensure presets are loaded before setting the state
   if (Object.keys(notificationPresets.value).length === 0) {
@@ -93,6 +130,19 @@ const handleSubmit = async () => {
     ElMessage.error('任务名称不能为空');
     return;
   }
+  
+  // --- Rule composition logic ---
+  const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
+  if (selectedRule) {
+    if (selectedRule.needs_value) {
+      form.value.rule = `${selectedRule.id}:${ruleValue.value}`;
+    } else {
+      form.value.rule = selectedRule.id;
+    }
+  } else {
+    form.value.rule = ruleValue.value; // Fallback
+  }
+  // --- End of rule composition ---
   
   // Set the correct template value before submitting
   if (selectedPresetKey.value === 'custom') {
@@ -167,9 +217,18 @@ watch(selectedPresetKey, (newKey) => {
   }
 });
 
+// Watcher to clear rule value when a rule that doesn't need a value is selected
+watch(selectedRuleId, (newId) => {
+  const selectedRule = rules.value.find(r => r.id === newId);
+  if (selectedRule && !selectedRule.needs_value) {
+    ruleValue.value = '';
+  }
+});
+
 onMounted(() => {
   fetchTasks();
   fetchPresets();
+  fetchRules();
 });
 </script>
 
@@ -210,7 +269,24 @@ onMounted(() => {
             <el-input v-model="form.frequency" placeholder="例如: 10m, 1h" />
           </el-form-item>
           <el-form-item label="提取规则">
-            <el-input v-model="form.rule" placeholder="例如: css: .price, regex: ..." />
+            <el-input v-model="ruleValue" placeholder="请输入规则值" :disabled="!rules.find(r => r.id === selectedRuleId)?.needs_value">
+              <template #prepend>
+                <el-select v-model="selectedRuleId" style="width: 130px">
+                  <el-option
+                    v-for="rule in rules"
+                    :key="rule.id"
+                    :label="rule.name"
+                    :value="rule.id"
+                  />
+                </el-select>
+              </template>
+            </el-input>
+            <div class="rule-description">
+              <p v-if="rules.find(r => r.id === selectedRuleId)">
+                {{ rules.find(r => r.id === selectedRuleId)?.description }}<br>
+                <em>{{ rules.find(r => r.id === selectedRuleId)?.example }}</em>
+              </p>
+            </div>
           </el-form-item>
           <el-form-item label="通知标题 (可选)">
             <el-input v-model="form.notification_title" />
@@ -342,5 +418,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+.rule-description {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 4px;
 }
 </style>

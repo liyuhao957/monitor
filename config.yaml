@@ -30,7 +30,7 @@ tasks:
   url: https://www.time163.com/
   frequency: 1m
   rule: css:#beijing-time
-  enabled: true
+  enabled: false
   screenshot: true
   notification_title: null
   notification: null

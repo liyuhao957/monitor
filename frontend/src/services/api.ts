@@ -36,6 +36,14 @@ export interface Notification {
   feishu: FeishuNotification;
 }
 
+export interface RuleInfo {
+  id: string;
+  name: string;
+  description: string;
+  example: string;
+  needs_value: boolean;
+}
+
 export const taskService = {
   getAllTasks() {
     return apiClient.get<Task[]>('/tasks/');
@@ -68,5 +76,8 @@ export const settingsService = {
   },
   getNotificationPresets() {
     return apiClient.get<Record<string, string>>('/settings/notifications/presets');
+  },
+  getExtractionRules() {
+    return apiClient.get<RuleInfo[]>('/settings/rules');
   }
 }; 
