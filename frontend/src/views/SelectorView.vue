@@ -5,13 +5,23 @@ import axios from 'axios';
 import { ElMessage } from 'element-plus';
 
 // 类型定义
+interface SelectorStrategy {
+  name: string;
+  css: string;
+  xpath: string;
+  description: string;
+}
+
 interface SelectorResult {
   css_selector: string;
+  css_options?: string[];
   xpath: string;
+  xpath_options?: string[];
   mode_recommend: string;
   example_text: string;
   tag: string;
   timestamp: number;
+  strategies?: SelectorStrategy[];
 }
 
 // 响应式状态
@@ -73,6 +83,27 @@ const restart = () => {
 // 清理选择结果但保持iframe
 const clearResult = () => {
   selectorResult.value = null;
+};
+
+// 复制到剪贴板
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success('已复制到剪贴板');
+  } catch (error) {
+    console.error('复制失败:', error);
+    ElMessage.error('复制失败');
+  }
+};
+
+// 测试选择器
+const testSelector = (selector: string, type: 'css' | 'xpath') => {
+  const testCode = type === 'css'
+    ? `document.querySelectorAll('${selector.replace(/'/g, "\\'")}').length`
+    : `document.evaluate('${selector.replace(/'/g, "\\'")}', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).snapshotLength`;
+
+  ElMessage.info(`请在目标网站的控制台中运行: ${testCode}`);
+  copyToClipboard(testCode);
 };
 
 // 使用选择器创建任务
@@ -245,13 +276,41 @@ onUnmounted(() => {
                 <el-tag>{{ selectorResult.tag }}</el-tag>
               </el-descriptions-item>
 
-              <el-descriptions-item label="CSS选择器">
-                <el-input
-                  :value="selectorResult.css_selector"
-                  readonly
-                  type="textarea"
-                  :rows="3"
-                />
+              <el-descriptions-item label="选择器策略" v-if="selectorResult.strategies && selectorResult.strategies.length > 0">
+                <div class="strategies-container">
+                  <div v-for="(strategy, index) in selectorResult.strategies" :key="index" class="strategy-item">
+                    <div class="strategy-header">
+                      <el-tag :type="index === 0 ? 'success' : 'info'" size="small">
+                        {{ index === 0 ? '推荐' : '备选' }}
+                      </el-tag>
+                      <span class="strategy-description">{{ strategy.description }}</span>
+                    </div>
+
+                    <div class="strategy-selectors">
+                      <div class="selector-row">
+                        <label>CSS:</label>
+                        <el-input
+                          :value="strategy.css"
+                          readonly
+                          size="small"
+                        />
+                        <el-button size="small" @click="copyToClipboard(strategy.css)">复制</el-button>
+                        <el-button size="small" @click="testSelector(strategy.css, 'css')">测试</el-button>
+                      </div>
+
+                      <div class="selector-row">
+                        <label>XPath:</label>
+                        <el-input
+                          :value="strategy.xpath"
+                          readonly
+                          size="small"
+                        />
+                        <el-button size="small" @click="copyToClipboard(strategy.xpath)">复制</el-button>
+                        <el-button size="small" @click="testSelector(strategy.xpath, 'xpath')">测试</el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </el-descriptions-item>
 
               <el-descriptions-item label="XPath">
@@ -398,5 +457,69 @@ onUnmounted(() => {
 .error-actions {
   margin-top: 16px;
   text-align: center;
+}
+
+.css-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.css-option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.css-option .el-input {
+  flex: 1;
+}
+
+.strategies-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.strategy-item {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.strategy-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.strategy-description {
+  font-size: 13px;
+  color: #606266;
+}
+
+.strategy-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selector-row label {
+  min-width: 50px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.selector-row .el-input {
+  flex: 1;
 }
 </style>

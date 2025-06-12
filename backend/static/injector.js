@@ -274,19 +274,280 @@
     
     // 生成选择器
     function generateSelectors(element) {
-        const cssSelector = generateCSSSelector(element);
-        const xpath = generateXPath(element);
+        // 生成多种选择器策略
+        const selectorStrategies = generateSelectorStrategies(element);
+
         const modeRecommend = inferMode(element);
         const exampleText = element.textContent ? element.textContent.trim().substring(0, 100) : '';
-        
+
         return {
-            css_selector: cssSelector,
-            xpath: xpath,
+            css_selector: selectorStrategies.primary.css,
+            css_options: selectorStrategies.all.map(s => s.css),
+            xpath: selectorStrategies.primary.xpath,
+            xpath_options: selectorStrategies.all.map(s => s.xpath),
             mode_recommend: modeRecommend,
             example_text: exampleText,
             tag: element.tagName.toLowerCase(),
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            strategies: selectorStrategies.all.map(s => ({
+                name: s.name,
+                css: s.css,
+                xpath: s.xpath,
+                description: s.description
+            }))
         };
+    }
+
+    // 生成多种选择器策略
+    function generateSelectorStrategies(element) {
+        const strategies = [];
+
+        // 策略1: 精确位置选择器（最适合监控最新内容）
+        const precisePositionStrategy = generatePrecisePositionStrategy(element);
+        if (precisePositionStrategy) {
+            strategies.push(precisePositionStrategy);
+        }
+
+        // 策略2: 属性选择器（最稳定）
+        const attributeStrategy = generateAttributeStrategy(element);
+        if (attributeStrategy) {
+            strategies.push(attributeStrategy);
+        }
+
+        // 策略3: 类名选择器（中等稳定性）
+        const classStrategy = generateClassStrategy(element);
+        if (classStrategy) {
+            strategies.push(classStrategy);
+        }
+
+        // 策略4: 结构化路径选择器（适合复杂页面）
+        const structuralStrategy = generateStructuralStrategy(element);
+        if (structuralStrategy) {
+            strategies.push(structuralStrategy);
+        }
+
+        // 策略5: 文本内容选择器（适合固定文本）
+        const textStrategy = generateTextStrategy(element);
+        if (textStrategy) {
+            strategies.push(textStrategy);
+        }
+
+        // 如果没有其他策略，使用基础策略
+        if (strategies.length === 0) {
+            strategies.push({
+                name: 'basic',
+                css: element.tagName.toLowerCase(),
+                xpath: `//${element.tagName.toLowerCase()}`,
+                description: '基础标签选择器（不推荐，会匹配多个元素）'
+            });
+        }
+
+        return {
+            primary: strategies[0],
+            all: strategies
+        };
+    }
+
+    // 生成精确位置策略（专门用于监控最新内容）
+    function generatePrecisePositionStrategy(element) {
+        const parent = element.parentElement;
+        if (!parent) return null;
+
+        const siblings = Array.from(parent.children).filter(child =>
+            child.tagName === element.tagName
+        );
+
+        if (siblings.length <= 1) return null;
+
+        const index = siblings.indexOf(element);
+
+        // 构建父元素的精确路径
+        const parentPath = buildPrecisePath(parent);
+
+        if (index === 0) {
+            return {
+                name: 'first-item',
+                css: `${parentPath} > ${element.tagName.toLowerCase()}:first-child`,
+                xpath: `${buildXPathPath(parent)}/${element.tagName.toLowerCase()}[1]`,
+                description: '第一个项目（适合监控最新内容）'
+            };
+        } else if (index === siblings.length - 1) {
+            return {
+                name: 'last-item',
+                css: `${parentPath} > ${element.tagName.toLowerCase()}:last-child`,
+                xpath: `${buildXPathPath(parent)}/${element.tagName.toLowerCase()}[last()]`,
+                description: '最后一个项目'
+            };
+        } else {
+            return {
+                name: 'nth-item',
+                css: `${parentPath} > ${element.tagName.toLowerCase()}:nth-child(${index + 1})`,
+                xpath: `${buildXPathPath(parent)}/${element.tagName.toLowerCase()}[${index + 1}]`,
+                description: `第${index + 1}个项目（固定位置）`
+            };
+        }
+    }
+
+    // 构建精确的CSS路径
+    function buildPrecisePath(element, maxDepth = 3) {
+        const path = [];
+        let current = element;
+        let depth = 0;
+
+        while (current && current !== document.body && depth < maxDepth) {
+            let selector = current.tagName.toLowerCase();
+
+            // 添加ID
+            if (current.id) {
+                selector = `#${current.id}`;
+                path.unshift(selector);
+                break;
+            }
+
+            // 添加有意义的类名
+            if (current.className && typeof current.className === 'string') {
+                const classes = current.className.trim().split(/\s+/)
+                    .filter(c => c &&
+                        !c.includes('outline') &&
+                        !c.match(/^(css-|_|sc-)/));
+
+                if (classes.length > 0) {
+                    const bestClass = classes.find(c =>
+                        c.includes('content') ||
+                        c.includes('section') ||
+                        c.includes('list') ||
+                        c.includes('container')
+                    ) || classes[0];
+
+                    selector += `.${bestClass}`;
+                }
+            }
+
+            path.unshift(selector);
+            current = current.parentElement;
+            depth++;
+        }
+
+        return path.join(' ');
+    }
+
+    // 构建XPath路径
+    function buildXPathPath(element, maxDepth = 3) {
+        const path = [];
+        let current = element;
+        let depth = 0;
+
+        while (current && current !== document.body && depth < maxDepth) {
+            if (current.id) {
+                return `//*[@id="${current.id}"]`;
+            }
+
+            const tagName = current.tagName.toLowerCase();
+            const siblings = Array.from(current.parentNode?.children || [])
+                .filter(sibling => sibling.tagName === current.tagName);
+
+            if (siblings.length === 1) {
+                path.unshift(tagName);
+            } else {
+                const index = siblings.indexOf(current) + 1;
+                path.unshift(`${tagName}[${index}]`);
+            }
+
+            current = current.parentElement;
+            depth++;
+        }
+
+        return '//' + path.join('/');
+    }
+
+    // 生成属性策略
+    function generateAttributeStrategy(element) {
+        const meaningfulAttrs = ['data-id', 'data-key', 'data-testid', 'name', 'role', 'href'];
+
+        for (const attr of meaningfulAttrs) {
+            if (element.hasAttribute(attr)) {
+                const value = element.getAttribute(attr);
+                if (value && value.length < 100) {
+                    return {
+                        name: 'attribute',
+                        css: `[${attr}="${value}"]`,
+                        xpath: `//*[@${attr}="${value}"]`,
+                        description: `基于${attr}属性（最稳定）`
+                    };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // 生成类名策略
+    function generateClassStrategy(element) {
+        if (!element.className || typeof element.className !== 'string') {
+            return null;
+        }
+
+        const classes = element.className.trim().split(/\s+/)
+            .filter(c => c &&
+                !c.includes('outline') &&
+                !c.match(/^(css-|_|sc-)/));
+
+        if (classes.length === 0) return null;
+
+        // 寻找最有意义的类名
+        const bestClass = classes.find(c =>
+            c.includes('item') ||
+            c.includes('entry') ||
+            c.includes('post') ||
+            c.includes('article') ||
+            c.includes('content')
+        ) || classes[0];
+
+        return {
+            name: 'class',
+            css: `.${bestClass}`,
+            xpath: `//*[contains(@class, "${bestClass}")]`,
+            description: `基于类名（中等稳定性）`
+        };
+    }
+
+    // 生成结构化策略
+    function generateStructuralStrategy(element) {
+        const path = buildPrecisePath(element, 4);
+        const xpathPath = buildXPathPath(element, 4);
+
+        if (path && path.split(' ').length > 1) {
+            return {
+                name: 'structural',
+                css: path,
+                xpath: xpathPath,
+                description: '基于页面结构（适合复杂页面）'
+            };
+        }
+
+        return null;
+    }
+
+    // 生成文本策略
+    function generateTextStrategy(element) {
+        const text = element.textContent?.trim();
+        if (!text || text.length > 50) return null;
+
+        // 检查文本是否在页面中唯一
+        const elementsWithSameText = Array.from(document.querySelectorAll(element.tagName))
+            .filter(el => el.textContent?.trim() === text);
+
+        if (elementsWithSameText.length === 1) {
+            const escapedText = text.replace(/"/g, '\\"');
+            return {
+                name: 'text',
+                css: `${element.tagName.toLowerCase()}`, // CSS不支持文本选择，这里只是标记
+                xpath: `//${element.tagName.toLowerCase()}[normalize-space(text())="${escapedText}"]`,
+                description: `基于文本内容（仅XPath可用）`
+            };
+        }
+
+        return null;
     }
     
     // 生成CSS选择器
@@ -295,60 +556,209 @@
         if (element.id) {
             return `#${element.id}`;
         }
-        
-        // 构建路径
-        const path = [];
-        let current = element;
-        
-        while (current && current !== document.body) {
-            let selector = current.tagName.toLowerCase();
-            
-            // 添加类名
-            if (current.className && typeof current.className === 'string') {
-                const classes = current.className.trim().split(/\s+/).filter(c => c);
-                if (classes.length > 0) {
-                    selector += '.' + classes.join('.');
+
+        // 分析元素的上下文，生成更智能的选择器
+        const selectors = [];
+
+        // 1. 尝试使用有意义的属性
+        const meaningfulAttrs = ['data-id', 'data-key', 'data-value', 'data-testid', 'name', 'role'];
+        for (const attr of meaningfulAttrs) {
+            if (element.hasAttribute(attr)) {
+                const value = element.getAttribute(attr);
+                if (value && value.length < 50) {
+                    selectors.push(`[${attr}="${value}"]`);
                 }
             }
-            
-            // 添加nth-child如果需要
-            const siblings = Array.from(current.parentNode?.children || [])
-                .filter(sibling => sibling.tagName === current.tagName);
-            
-            if (siblings.length > 1) {
-                const index = siblings.indexOf(current) + 1;
-                selector += `:nth-child(${index})`;
+        }
+
+        // 2. 分析类名，选择有意义的类
+        if (element.className && typeof element.className === 'string') {
+            const classes = element.className.trim().split(/\s+/)
+                .filter(c => c &&
+                    !c.includes('outline') &&
+                    !c.includes('style') &&
+                    !c.includes('color') &&
+                    !c.match(/^(css-|_|sc-)/)); // 过滤CSS-in-JS生成的类名
+
+            if (classes.length > 0) {
+                // 优先使用看起来有语义的类名
+                const semanticClasses = classes.filter(c =>
+                    c.includes('item') ||
+                    c.includes('list') ||
+                    c.includes('content') ||
+                    c.includes('title') ||
+                    c.includes('link') ||
+                    c.length > 3
+                );
+
+                if (semanticClasses.length > 0) {
+                    selectors.push(`.${semanticClasses[0]}`);
+                    selectors.push(`${element.tagName.toLowerCase()}.${semanticClasses[0]}`);
+                } else if (classes.length > 0) {
+                    selectors.push(`.${classes[0]}`);
+                }
             }
-            
+        }
+
+        // 3. 生成基于结构的选择器
+        const structuralSelector = generateStructuralSelector(element);
+        if (structuralSelector) {
+            selectors.push(structuralSelector);
+        }
+
+        // 4. 生成基于位置的选择器
+        const positionSelector = generatePositionSelector(element);
+        if (positionSelector) {
+            selectors.push(positionSelector);
+        }
+
+        // 返回最佳选择器
+        return selectors[0] || element.tagName.toLowerCase();
+    }
+
+    // 生成结构化选择器
+    function generateStructuralSelector(element) {
+        const path = [];
+        let current = element;
+        let depth = 0;
+
+        while (current && current !== document.body && depth < 3) {
+            let selector = current.tagName.toLowerCase();
+
+            // 添加有意义的类名
+            if (current.className && typeof current.className === 'string') {
+                const classes = current.className.trim().split(/\s+/)
+                    .filter(c => c &&
+                        !c.includes('outline') &&
+                        !c.match(/^(css-|_|sc-)/));
+
+                if (classes.length > 0) {
+                    const bestClass = classes.find(c =>
+                        c.includes('item') ||
+                        c.includes('list') ||
+                        c.includes('content')
+                    ) || classes[0];
+
+                    selector += `.${bestClass}`;
+                }
+            }
+
             path.unshift(selector);
             current = current.parentElement;
+            depth++;
         }
-        
-        return path.join(' > ');
+
+        return path.length > 1 ? path.join(' ') : null;
+    }
+
+    // 生成基于位置的选择器
+    function generatePositionSelector(element) {
+        const parent = element.parentElement;
+        if (!parent) return null;
+
+        const siblings = Array.from(parent.children).filter(child =>
+            child.tagName === element.tagName
+        );
+
+        if (siblings.length <= 1) {
+            return element.tagName.toLowerCase();
+        }
+
+        const index = siblings.indexOf(element);
+
+        // 如果是第一个或最后一个，使用更语义化的选择器
+        if (index === 0) {
+            return `${element.tagName.toLowerCase()}:first-child`;
+        } else if (index === siblings.length - 1) {
+            return `${element.tagName.toLowerCase()}:last-child`;
+        } else {
+            return `${element.tagName.toLowerCase()}:nth-child(${index + 1})`;
+        }
     }
     
     // 生成XPath
     function generateXPath(element) {
+        // 优先使用ID
+        if (element.id) {
+            return `//*[@id="${element.id}"]`;
+        }
+
+        // 尝试使用有意义的属性
+        const meaningfulAttrs = ['data-id', 'data-key', 'data-testid', 'name', 'role'];
+        for (const attr of meaningfulAttrs) {
+            if (element.hasAttribute(attr)) {
+                const value = element.getAttribute(attr);
+                if (value && value.length < 50) {
+                    return `//*[@${attr}="${value}"]`;
+                }
+            }
+        }
+
+        // 尝试使用类名（选择有意义的类）
+        if (element.className && typeof element.className === 'string') {
+            const classes = element.className.trim().split(/\s+/)
+                .filter(c => c &&
+                    !c.includes('outline') &&
+                    !c.match(/^(css-|_|sc-)/));
+
+            if (classes.length > 0) {
+                const bestClass = classes.find(c =>
+                    c.includes('item') ||
+                    c.includes('list') ||
+                    c.includes('content') ||
+                    c.includes('title')
+                ) || classes[0];
+
+                return `//${element.tagName.toLowerCase()}[contains(@class, "${bestClass}")]`;
+            }
+        }
+
+        // 生成基于位置的XPath
+        const parent = element.parentElement;
+        if (parent) {
+            const siblings = Array.from(parent.children).filter(child =>
+                child.tagName === element.tagName
+            );
+
+            if (siblings.length === 1) {
+                // 如果是唯一的同类型元素
+                return `//${element.tagName.toLowerCase()}`;
+            } else {
+                const index = siblings.indexOf(element) + 1;
+
+                // 使用更语义化的位置表达式
+                if (index === 1) {
+                    return `//${element.tagName.toLowerCase()}[1]`;
+                } else if (index === siblings.length) {
+                    return `//${element.tagName.toLowerCase()}[last()]`;
+                } else {
+                    return `//${element.tagName.toLowerCase()}[${index}]`;
+                }
+            }
+        }
+
+        // 生成简单的相对路径XPath（最多2层）
         const path = [];
         let current = element;
-        
-        while (current && current !== document) {
-            let index = 1;
-            let sibling = current.previousSibling;
-            
-            while (sibling) {
-                if (sibling.nodeType === 1 && sibling.tagName === current.tagName) {
-                    index++;
-                }
-                sibling = sibling.previousSibling;
-            }
-            
+        let depth = 0;
+
+        while (current && current !== document.body && depth < 2) {
             const tagName = current.tagName.toLowerCase();
-            path.unshift(`${tagName}[${index}]`);
+            const siblings = Array.from(current.parentNode?.children || [])
+                .filter(sibling => sibling.tagName === current.tagName);
+
+            if (siblings.length === 1) {
+                path.unshift(tagName);
+            } else {
+                const index = siblings.indexOf(current) + 1;
+                path.unshift(`${tagName}[${index}]`);
+            }
+
             current = current.parentElement;
+            depth++;
         }
-        
-        return '/' + path.join('/');
+
+        return '//' + path.join('/');
     }
     
     // 推断模式
