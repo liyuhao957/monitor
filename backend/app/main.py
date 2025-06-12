@@ -1,7 +1,17 @@
 import logging
 import asyncio
+import sys
+import platform
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Fix for Windows compatibility with Playwright
+if platform.system() == 'Windows':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles

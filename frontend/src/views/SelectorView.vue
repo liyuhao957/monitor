@@ -21,6 +21,7 @@ interface SelectorResult {
   example_text: string;
   tag: string;
   timestamp: number;
+  intent?: string;
   strategies?: SelectorStrategy[];
 }
 
@@ -134,6 +135,36 @@ const handleMessage = (event: MessageEvent) => {
     console.log('Received selector result:', event.data.data);
   } else {
     console.log('Message type not recognized:', event.data?.type);
+  }
+};
+
+// 获取模式标签类型
+const getModeTagType = (mode: string) => {
+  switch (mode) {
+    case 'latest': return 'success';
+    case 'fixed': return 'info';
+    case 'list': return 'warning';
+    default: return 'info';
+  }
+};
+
+// 获取模式显示名称
+const getModeDisplayName = (mode: string) => {
+  switch (mode) {
+    case 'latest': return '最新内容监控';
+    case 'fixed': return '固定位置监控';
+    case 'list': return '列表监控';
+    default: return mode === 'latest' ? '最新内容' : mode === 'list' ? '列表项' : '固定区域';
+  }
+};
+
+// 获取模式描述
+const getModeDescription = (intent: string) => {
+  switch (intent) {
+    case 'latest': return '将监控列表中第一个位置的内容，无论内容如何更新';
+    case 'fixed': return '将监控当前选中的这个具体元素的内容变化';
+    case 'list': return '将监控列表中所有项目的变化';
+    default: return '';
   }
 };
 
@@ -322,11 +353,13 @@ onUnmounted(() => {
                 />
               </el-descriptions-item>
 
-              <el-descriptions-item label="推荐模式">
-                <el-tag :type="selectorResult.mode_recommend === 'latest' ? 'success' : 'info'">
-                  {{ selectorResult.mode_recommend === 'latest' ? '最新内容' :
-                     selectorResult.mode_recommend === 'list' ? '列表项' : '固定区域' }}
+              <el-descriptions-item label="监控模式">
+                <el-tag :type="getModeTagType(selectorResult.mode_recommend)">
+                  {{ getModeDisplayName(selectorResult.mode_recommend) }}
                 </el-tag>
+                <div v-if="selectorResult.intent" class="mode-description">
+                  {{ getModeDescription(selectorResult.intent) }}
+                </div>
               </el-descriptions-item>
 
               <el-descriptions-item label="示例文本" v-if="selectorResult.example_text">
@@ -521,5 +554,13 @@ onUnmounted(() => {
 
 .selector-row .el-input {
   flex: 1;
+}
+
+.mode-description {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  line-height: 1.4;
 }
 </style>

@@ -4,6 +4,7 @@
 """
 import asyncio
 import logging
+import os
 from typing import Dict, Any
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+from app.services.ai_selector import AISelector, SelectorRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,6 +31,13 @@ class SelectorResult(BaseModel):
     example_text: str
     tag: str
     timestamp: int
+
+class AIGenerateRequest(BaseModel):
+    element_html: str
+    context_html: str
+    user_intent: str
+    element_text: str
+    element_attributes: Dict[str, Any]
 
 @router.post("/load")
 async def create_selector_session(request: UrlRequest):
@@ -146,3 +156,48 @@ async def list_active_sessions():
     列出所有活跃会话（调试用）
     """
     return {"active_sessions": list(active_sessions.keys())}
+
+@router.post("/ai-generate")
+async def ai_generate_selector(request: AIGenerateRequest):
+    """
+    使用AI生成最优选择器
+    """
+    try:
+        # 获取API配置
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL", "https://api.oaipro.com/v1")
+
+        if not api_key:
+            raise HTTPException(status_code=500, detail="未配置OpenAI API Key")
+
+        # 创建AI选择器生成器
+        ai_selector = AISelector(api_key=api_key, base_url=base_url)
+
+        # 构建请求
+        selector_request = SelectorRequest(
+            element_html=request.element_html,
+            context_html=request.context_html,
+            user_intent=request.user_intent,
+            element_text=request.element_text,
+            element_attributes=request.element_attributes
+        )
+
+        # 生成选择器
+        result = ai_selector.generate_selector(selector_request)
+
+        # 转换为API响应格式
+        return {
+            "css_selector": result.css_selector,
+            "xpath": result.xpath,
+            "mode_recommend": request.user_intent,
+            "example_text": request.element_text,
+            "tag": "ai-generated",
+            "timestamp": int(asyncio.get_event_loop().time() * 1000),
+            "description": result.description,
+            "confidence": result.confidence,
+            "intent": request.user_intent
+        }
+
+    except Exception as e:
+        logger.error(f"AI选择器生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"AI选择器生成失败: {str(e)}")
