@@ -1,0 +1,402 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+import { ElMessage } from 'element-plus';
+
+// 类型定义
+interface SelectorResult {
+  css_selector: string;
+  xpath: string;
+  mode_recommend: string;
+  example_text: string;
+  tag: string;
+  timestamp: number;
+}
+
+// 响应式状态
+const router = useRouter();
+const url = ref('https://news.ycombinator.com');
+const isLoading = ref(false);
+const sessionId = ref('');
+const selectorResult = ref<SelectorResult | null>(null);
+const iframeUrl = ref('');
+const errorMessage = ref('');
+
+// API基础URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// 消息监听器引用
+let messageListener: ((event: MessageEvent) => void) | null = null;
+
+// 加载页面
+const loadPage = async () => {
+  if (!url.value.trim()) {
+    ElMessage.error('请输入有效的URL');
+    return;
+  }
+
+  isLoading.value = true;
+  errorMessage.value = '';
+  selectorResult.value = null;
+
+  try {
+    // 创建选择器会话
+    const response = await axios.post(`${API_BASE_URL}/api/selector/load`, {
+      url: url.value
+    });
+
+    sessionId.value = response.data.session_id;
+
+    // 构建iframe URL
+    iframeUrl.value = `${API_BASE_URL}/api/selector/render/${sessionId.value}`;
+
+    ElMessage.success('页面加载成功，请点击要监控的元素');
+  } catch (error: any) {
+    console.error('Error loading page:', error);
+    errorMessage.value = error.response?.data?.detail || '页面加载失败';
+    ElMessage.error(errorMessage.value);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// 重新开始
+const restart = () => {
+  url.value = '';
+  sessionId.value = '';
+  selectorResult.value = null;
+  iframeUrl.value = '';
+  errorMessage.value = '';
+};
+
+// 清理选择结果但保持iframe
+const clearResult = () => {
+  selectorResult.value = null;
+};
+
+// 使用选择器创建任务
+const createTask = () => {
+  if (!selectorResult.value) return;
+
+  // 跳转到任务管理页面，并传递选择器信息
+  router.push({
+    path: '/',
+    query: {
+      newTask: 'true',
+      url: url.value,
+      selector: selectorResult.value.css_selector,
+      mode: selectorResult.value.mode_recommend
+    }
+  });
+};
+
+// 处理来自iframe的消息
+const handleMessage = (event: MessageEvent) => {
+  console.log('Received message from iframe:', event);
+  console.log('Message data:', event.data);
+  console.log('Message origin:', event.origin);
+
+  if (event.data?.type === 'SELECTOR_RESULT') {
+    selectorResult.value = event.data.data;
+    ElMessage.success('元素选择成功！');
+    console.log('Received selector result:', event.data.data);
+  } else {
+    console.log('Message type not recognized:', event.data?.type);
+  }
+};
+
+// 生命周期钩子
+onMounted(() => {
+  messageListener = handleMessage;
+  window.addEventListener('message', messageListener);
+});
+
+onUnmounted(() => {
+  if (messageListener) {
+    window.removeEventListener('message', messageListener);
+  }
+
+  // 清理会话
+  if (sessionId.value) {
+    axios.delete(`${API_BASE_URL}/api/selector/session/${sessionId.value}`)
+      .catch(console.error);
+  }
+});
+</script>
+
+<template>
+  <div class="selector-view">
+    <el-container>
+      <!-- 头部 -->
+      <el-header class="header">
+        <h1>可视化元素选择器</h1>
+        <p class="subtitle">通过点击页面元素自动生成CSS选择器和XPath</p>
+      </el-header>
+
+      <el-container>
+        <!-- 左侧主内容区 -->
+        <el-main class="main-content">
+          <!-- URL输入区域 -->
+          <el-card v-if="!iframeUrl" class="url-card">
+            <template #header>
+              <div class="card-header">
+                <span>输入目标网页URL</span>
+              </div>
+            </template>
+
+            <div class="url-input-section">
+              <el-input
+                v-model="url"
+                placeholder="例如: https://news.ycombinator.com"
+                size="large"
+                :disabled="isLoading"
+                @keyup.enter="loadPage"
+              >
+                <template #prepend>
+                  <el-icon><span>🔗</span></el-icon>
+                </template>
+              </el-input>
+
+              <el-button
+                type="primary"
+                size="large"
+                :loading="isLoading"
+                @click="loadPage"
+                class="load-button"
+              >
+                {{ isLoading ? '加载中...' : '加载页面' }}
+              </el-button>
+            </div>
+
+            <div class="tips">
+              <el-alert
+                title="使用提示"
+                type="info"
+                :closable="false"
+                show-icon
+              >
+                <ul>
+                  <li>输入要监控的网页URL</li>
+                  <li>页面加载后，点击要监控的元素</li>
+                  <li>系统将自动生成CSS选择器和XPath</li>
+                  <li>支持HTTPS网站的安全访问</li>
+                </ul>
+              </el-alert>
+            </div>
+          </el-card>
+
+          <!-- iframe展示区域 -->
+          <el-card v-if="iframeUrl" class="iframe-card">
+            <template #header>
+              <div class="card-header">
+                <span>{{ url }}</span>
+                <el-button size="small" @click="restart">重新开始</el-button>
+              </div>
+            </template>
+
+            <div class="iframe-container">
+              <iframe
+                :src="iframeUrl"
+                frameborder="0"
+                class="target-iframe"
+                title="目标网页"
+              ></iframe>
+            </div>
+
+            <div class="iframe-tips">
+              <el-alert
+                title="请点击要监控的页面元素"
+                type="warning"
+                :closable="false"
+                show-icon
+              >
+                点击页面中的任意元素，系统将自动生成对应的选择器规则
+              </el-alert>
+            </div>
+          </el-card>
+
+          <!-- 错误信息 -->
+          <el-card v-if="errorMessage" class="error-card">
+            <el-alert
+              :title="errorMessage"
+              type="error"
+              show-icon
+              :closable="false"
+            />
+            <div class="error-actions">
+              <el-button @click="restart">重新开始</el-button>
+            </div>
+          </el-card>
+        </el-main>
+
+        <!-- 右侧结果展示区 -->
+        <el-aside v-if="selectorResult" width="400px" class="result-sidebar">
+          <el-card class="result-card">
+            <template #header>
+              <div class="card-header">
+                <span>选择器结果</span>
+                <el-button size="small" @click="clearResult">继续选择</el-button>
+              </div>
+            </template>
+
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="元素标签">
+                <el-tag>{{ selectorResult.tag }}</el-tag>
+              </el-descriptions-item>
+
+              <el-descriptions-item label="CSS选择器">
+                <el-input
+                  :value="selectorResult.css_selector"
+                  readonly
+                  type="textarea"
+                  :rows="3"
+                />
+              </el-descriptions-item>
+
+              <el-descriptions-item label="XPath">
+                <el-input
+                  :value="selectorResult.xpath"
+                  readonly
+                  type="textarea"
+                  :rows="3"
+                />
+              </el-descriptions-item>
+
+              <el-descriptions-item label="推荐模式">
+                <el-tag :type="selectorResult.mode_recommend === 'latest' ? 'success' : 'info'">
+                  {{ selectorResult.mode_recommend === 'latest' ? '最新内容' :
+                     selectorResult.mode_recommend === 'list' ? '列表项' : '固定区域' }}
+                </el-tag>
+              </el-descriptions-item>
+
+              <el-descriptions-item label="示例文本" v-if="selectorResult.example_text">
+                <div class="example-text">{{ selectorResult.example_text }}</div>
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <div class="result-actions">
+              <el-button type="primary" @click="createTask">
+                创建监控任务
+              </el-button>
+              <el-button @click="clearResult">继续选择</el-button>
+              <el-button @click="restart">重新开始</el-button>
+            </div>
+          </el-card>
+        </el-aside>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<style scoped>
+.selector-view {
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.header {
+  background: white;
+  border-bottom: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px;
+}
+
+.header h1 {
+  margin: 0 0 8px 0;
+  color: #303133;
+  font-size: 24px;
+}
+
+.subtitle {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.main-content {
+  padding: 20px;
+}
+
+.url-card, .iframe-card, .error-card {
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.url-input-section {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.url-input-section .el-input {
+  flex: 1;
+}
+
+.load-button {
+  min-width: 120px;
+}
+
+.tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.tips li {
+  margin-bottom: 4px;
+}
+
+.iframe-container {
+  height: 600px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.target-iframe {
+  width: 100%;
+  height: 100%;
+}
+
+.iframe-tips {
+  margin-top: 12px;
+}
+
+.result-sidebar {
+  padding: 20px;
+  background: white;
+  border-left: 1px solid #e4e7ed;
+}
+
+.result-card {
+  height: fit-content;
+}
+
+.example-text {
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.result-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.error-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+</style>

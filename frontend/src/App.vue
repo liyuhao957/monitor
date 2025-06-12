@@ -30,6 +30,7 @@ const handleSelect = (key: string) => {
         @select="handleSelect"
       >
         <el-menu-item index="/">任务管理</el-menu-item>
+        <el-menu-item index="/selector">元素选择器</el-menu-item>
         <el-menu-item index="/logs">日志查看</el-menu-item>
         <el-menu-item index="/settings">通知设置</el-menu-item>
       </el-menu>
