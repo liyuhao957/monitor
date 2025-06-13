@@ -17,12 +17,21 @@ interface SelectorResult {
   css_options?: string[];
   xpath: string;
   xpath_options?: string[];
+  recommended_type: string;
   mode_recommend: string;
   example_text: string;
   tag: string;
   timestamp: number;
   intent?: string;
   strategies?: SelectorStrategy[];
+  description?: string;
+  confidence?: number;
+  type_analysis?: {
+    [key: string]: {
+      score: number;
+      reason: string;
+    };
+  };
 }
 
 // 响应式状态
@@ -168,6 +177,40 @@ const getModeDescription = (intent: string) => {
   }
 };
 
+// 获取选择器类型标签类型
+const getSelectorTypeTagType = (type: string) => {
+  switch (type) {
+    case 'css': return 'success';
+    case 'xpath': return 'warning';
+    default: return 'info';
+  }
+};
+
+// 获取选择器类型显示名称
+const getSelectorTypeDisplayName = (type: string) => {
+  switch (type) {
+    case 'css': return 'CSS选择器';
+    case 'xpath': return 'XPath';
+    default: return type;
+  }
+};
+
+// 测试选择器（支持CSS和XPath）
+const testSelectorExtended = (selector: string, type: 'css' | 'xpath') => {
+  let testCode = '';
+  switch (type) {
+    case 'css':
+      testCode = `document.querySelectorAll('${selector.replace(/'/g, "\\'")}').length`;
+      break;
+    case 'xpath':
+      testCode = `document.evaluate('${selector.replace(/'/g, "\\'")}', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).snapshotLength`;
+      break;
+  }
+
+  ElMessage.info(`请在目标网站的控制台中运行: ${testCode}`);
+  copyToClipboard(testCode);
+};
+
 // 生命周期钩子
 onMounted(() => {
   messageListener = handleMessage;
@@ -307,51 +350,76 @@ onUnmounted(() => {
                 <el-tag>{{ selectorResult.tag }}</el-tag>
               </el-descriptions-item>
 
-              <el-descriptions-item label="选择器策略" v-if="selectorResult.strategies && selectorResult.strategies.length > 0">
-                <div class="strategies-container">
-                  <div v-for="(strategy, index) in selectorResult.strategies" :key="index" class="strategy-item">
-                    <div class="strategy-header">
-                      <el-tag :type="index === 0 ? 'success' : 'info'" size="small">
-                        {{ index === 0 ? '推荐' : '备选' }}
-                      </el-tag>
-                      <span class="strategy-description">{{ strategy.description }}</span>
-                    </div>
+              <!-- AI推荐的选择器类型 -->
+              <el-descriptions-item label="AI推荐类型" v-if="selectorResult.recommended_type">
+                <el-tag :type="getSelectorTypeTagType(selectorResult.recommended_type)" size="large">
+                  🤖 {{ getSelectorTypeDisplayName(selectorResult.recommended_type) }}
+                </el-tag>
+                <div v-if="selectorResult.description" class="recommendation-description">
+                  {{ selectorResult.description }}
+                </div>
+              </el-descriptions-item>
 
-                    <div class="strategy-selectors">
-                      <div class="selector-row">
-                        <label>CSS:</label>
-                        <el-input
-                          :value="strategy.css"
-                          readonly
-                          size="small"
-                        />
-                        <el-button size="small" @click="copyToClipboard(strategy.css)">复制</el-button>
-                        <el-button size="small" @click="testSelector(strategy.css, 'css')">测试</el-button>
-                      </div>
-
-                      <div class="selector-row">
-                        <label>XPath:</label>
-                        <el-input
-                          :value="strategy.xpath"
-                          readonly
-                          size="small"
-                        />
-                        <el-button size="small" @click="copyToClipboard(strategy.xpath)">复制</el-button>
-                        <el-button size="small" @click="testSelector(strategy.xpath, 'xpath')">测试</el-button>
-                      </div>
+              <!-- 所有选择器类型 -->
+              <el-descriptions-item label="CSS选择器">
+                <div class="selector-item">
+                  <div class="selector-header">
+                    <el-tag
+                      :type="selectorResult.recommended_type === 'css' ? 'success' : 'info'"
+                      size="small"
+                    >
+                      {{ selectorResult.recommended_type === 'css' ? '🌟 推荐' : 'CSS' }}
+                    </el-tag>
+                    <div class="selector-score" v-if="selectorResult.type_analysis?.css">
+                      评分: {{ selectorResult.type_analysis.css.score }}
                     </div>
+                  </div>
+                  <el-input
+                    :value="selectorResult.css_selector"
+                    readonly
+                    type="textarea"
+                    :rows="2"
+                  />
+                  <div class="selector-actions">
+                    <el-button size="small" @click="copyToClipboard(selectorResult.css_selector)">复制</el-button>
+                    <el-button size="small" @click="testSelectorExtended(selectorResult.css_selector, 'css')">测试</el-button>
+                  </div>
+                  <div v-if="selectorResult.type_analysis?.css?.reason" class="selector-reason">
+                    {{ selectorResult.type_analysis.css.reason }}
                   </div>
                 </div>
               </el-descriptions-item>
 
               <el-descriptions-item label="XPath">
-                <el-input
-                  :value="selectorResult.xpath"
-                  readonly
-                  type="textarea"
-                  :rows="3"
-                />
+                <div class="selector-item">
+                  <div class="selector-header">
+                    <el-tag
+                      :type="selectorResult.recommended_type === 'xpath' ? 'success' : 'warning'"
+                      size="small"
+                    >
+                      {{ selectorResult.recommended_type === 'xpath' ? '🌟 推荐' : 'XPath' }}
+                    </el-tag>
+                    <div class="selector-score" v-if="selectorResult.type_analysis?.xpath">
+                      评分: {{ selectorResult.type_analysis.xpath.score }}
+                    </div>
+                  </div>
+                  <el-input
+                    :value="selectorResult.xpath"
+                    readonly
+                    type="textarea"
+                    :rows="2"
+                  />
+                  <div class="selector-actions">
+                    <el-button size="small" @click="copyToClipboard(selectorResult.xpath)">复制</el-button>
+                    <el-button size="small" @click="testSelectorExtended(selectorResult.xpath, 'xpath')">测试</el-button>
+                  </div>
+                  <div v-if="selectorResult.type_analysis?.xpath?.reason" class="selector-reason">
+                    {{ selectorResult.type_analysis.xpath.reason }}
+                  </div>
+                </div>
               </el-descriptions-item>
+
+
 
               <el-descriptions-item label="监控模式">
                 <el-tag :type="getModeTagType(selectorResult.mode_recommend)">
@@ -512,6 +580,52 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.selector-item {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.selector-score {
+  font-size: 12px;
+  color: #909399;
+  font-weight: bold;
+}
+
+.selector-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.selector-reason {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #606266;
+  background: #f0f2f5;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border-left: 3px solid #409eff;
+}
+
+.recommendation-description {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #0066cc;
 }
 
 .strategy-item {

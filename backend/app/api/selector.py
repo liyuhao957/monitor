@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
@@ -88,20 +88,23 @@ async def render_page_with_injector(session_id: str):
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page()
-            
+
             # 设置用户代理和视口
             await page.set_viewport_size({"width": 1280, "height": 720})
-            
-            # 导航到目标URL
-            await page.goto(target_url, wait_until='networkidle', timeout=30000)
-            
+
+            # 导航到目标URL，等待页面完全加载
+            await page.goto(target_url, wait_until='domcontentloaded', timeout=30000)
+
+            # 等待一段时间让JavaScript渲染完成
+            await page.wait_for_timeout(3000)
+
             # 获取页面HTML内容
             html_content = await page.content()
-            
+
             await browser.close()
         
         # 注入脚本到HTML
-        injected_html = inject_script_to_html(html_content, injector_script)
+        injected_html = inject_script_to_html(html_content, injector_script, target_url)
         
         logger.info(f"Successfully rendered and injected script for session {session_id}")
         return HTMLResponse(content=injected_html)
@@ -113,12 +116,19 @@ async def render_page_with_injector(session_id: str):
         logger.error(f"Error rendering page for session {session_id}: {e}")
         raise HTTPException(status_code=500, detail="页面渲染失败")
 
-def inject_script_to_html(html_content: str, script_content: str) -> str:
+def inject_script_to_html(html_content: str, script_content: str, base_url: str) -> str:
     """
     将JavaScript脚本注入到HTML的body标签闭合之前，并修复相对路径问题
     """
+    import re
+    from urllib.parse import urljoin, urlparse
+
+    # 解析基础URL
+    parsed_url = urlparse(base_url)
+    base_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
     # 添加base标签来修复相对路径问题
-    base_tag = '<base href="/">'
+    base_tag = f'<base href="{base_domain}/">'
 
     # 创建脚本标签
     script_tag = f'<script type="text/javascript">\n{script_content}\n</script>'
@@ -128,6 +138,9 @@ def inject_script_to_html(html_content: str, script_content: str) -> str:
         html_content = html_content.replace('<head>', f'<head>\n{base_tag}')
     elif '<html>' in html_content:
         html_content = html_content.replace('<html>', f'<html>\n<head>{base_tag}</head>')
+    else:
+        # 如果没有head标签，在开头添加
+        html_content = f'<head>{base_tag}</head>\n{html_content}'
 
     # 查找</body>标签并在其前面插入脚本
     if '</body>' in html_content:
@@ -189,13 +202,15 @@ async def ai_generate_selector(request: AIGenerateRequest):
         return {
             "css_selector": result.css_selector,
             "xpath": result.xpath,
+            "recommended_type": result.recommended_type,
             "mode_recommend": request.user_intent,
             "example_text": request.element_text,
             "tag": "ai-generated",
             "timestamp": int(asyncio.get_event_loop().time() * 1000),
             "description": result.description,
             "confidence": result.confidence,
-            "intent": request.user_intent
+            "intent": request.user_intent,
+            "type_analysis": result.type_analysis
         }
 
     except Exception as e:

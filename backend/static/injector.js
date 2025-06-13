@@ -48,8 +48,10 @@
                 z-index: 10000;
                 font-family: Arial, sans-serif;
                 font-size: 12px;
-                min-width: 300px;
-                max-width: 400px;
+                min-width: 400px;
+                max-width: 600px;
+                max-height: 500px;
+                overflow-y: auto;
             }
             .selector-popover button {
                 margin: 0 5px;
@@ -69,6 +71,21 @@
             }
             .selector-popover button.primary:hover {
                 background: #0056b3;
+            }
+            .selector-popover .target-option {
+                background: #f8f9fa;
+                border: 1px solid #e9ecef;
+                border-radius: 3px;
+                padding: 8px 10px;
+                margin: 4px 0;
+                font-family: monospace;
+                font-size: 11px;
+                line-height: 1.4;
+                word-break: break-all;
+                white-space: pre-wrap;
+            }
+            .selector-popover .target-option:hover {
+                background: #e9ecef;
             }
         `;
         document.head.appendChild(style);
@@ -122,9 +139,14 @@
                 // 不要preventDefault和stopPropagation，让按钮的事件监听器正常工作
                 return;
             }
-            // 如果是单选按钮或标签，允许正常交互
-            if (element.type === 'radio' || element.tagName.toLowerCase() === 'label') {
-                console.log('Click on radio button or label, allowing default behavior');
+            // 如果是单选按钮、标签或标签内的文本元素，允许正常交互
+            if (element.type === 'radio' ||
+                element.tagName.toLowerCase() === 'label' ||
+                element.closest('label') ||
+                ['strong', 'span', 'br'].includes(element.tagName.toLowerCase())) {
+                console.log('Click on radio button, label, or label content, allowing default behavior');
+                // 不阻止默认行为，但阻止事件冒泡
+                event.stopPropagation();
                 return;
             }
             console.log('Click on other popover area, ignoring');
@@ -170,21 +192,27 @@
     
     // 选择元素
     function selectElement(element) {
+        console.log('selectElement called with:', element);
+
         // 清除之前的选择
         if (selectedElement) {
             deselectElement();
         }
-        
+
         clearHighlight();
         selectedElement = element;
-        
+
         // 应用选中样式
         const originalStyle = element.style.cssText;
         element.dataset.selectedOriginalStyle = originalStyle;
         Object.assign(element.style, SELECTED_STYLE);
-        
+
+        console.log('About to show popover for element:', element);
+
         // 显示弹窗
         showPopover(element);
+
+        console.log('showPopover completed');
     }
     
     // 取消选择元素
@@ -203,11 +231,39 @@
     function showPopover(element) {
         hidePopover();
 
+        // 获取可选的父容器
+        const parentOptions = getParentContainerOptions(element);
+
         popover = document.createElement('div');
         popover.className = 'selector-popover';
+
+        let parentOptionsHtml = '';
+        if (parentOptions.length > 1) {
+            parentOptionsHtml = `
+                <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                    <div style="font-weight: bold; margin-bottom: 8px;">选择目标元素:</div>
+                    ${parentOptions.map((option, index) => {
+                        const escapedDescription = option.description.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        return `
+                        <div style="margin: 6px 0; padding: 6px; border: 1px solid #e0e0e0; border-radius: 4px; background: ${index === 0 ? '#f0f8ff' : '#f9f9f9'};">
+                            <label style="display: block; cursor: pointer; font-size: 12px;">
+                                <input type="radio" name="target-element" value="${index}" ${index === 0 ? 'checked' : ''} style="margin-right: 8px;">
+                                <strong>${index === 0 ? '当前元素' : `父容器 ${index}`}</strong>
+                                <br>
+                                <span style="color: #666; font-size: 10px; font-family: monospace; word-break: break-all;">
+                                    ${escapedDescription}
+                                </span>
+                            </label>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         popover.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 10px;">已选择元素: ${element.tagName.toLowerCase()}</div>
-            <div style="margin-bottom: 10px;">您想监控什么内容？</div>
+            ${parentOptionsHtml}
+            <div style="font-weight: bold; margin-bottom: 10px;">监控类型:</div>
             <div style="margin: 5px 0;">
                 <label style="display: block; margin: 5px 0; cursor: pointer;">
                     <input type="radio" name="monitor-intent" value="fixed" style="margin-right: 5px;">
@@ -250,6 +306,10 @@
         const confirmBtn = popover.querySelector('.confirm-btn');
         const reselectBtn = popover.querySelector('.reselect-btn');
 
+        console.log('Popover HTML:', popover.innerHTML);
+        console.log('Found confirm button:', confirmBtn);
+        console.log('Found reselect button:', reselectBtn);
+
         if (confirmBtn) {
             console.log('Adding click listener to confirm button');
             confirmBtn.addEventListener('click', function(e) {
@@ -258,6 +318,8 @@
                 e.stopPropagation();
                 confirmSelection();
             });
+        } else {
+            console.error('Confirm button not found!');
         }
 
         if (reselectBtn) {
@@ -268,16 +330,131 @@
                 e.stopPropagation();
                 reselectElement();
             });
+        } else {
+            console.error('Reselect button not found!');
         }
+
+        // 为单选按钮添加change事件监听器，确保选中状态正确更新
+        const radioButtons = popover.querySelectorAll('input[type="radio"]');
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', function(e) {
+                console.log('Radio button changed:', e.target.name, '=', e.target.value);
+                // 更新视觉反馈
+                if (e.target.name === 'target-element') {
+                    updateTargetElementSelection(e.target.value);
+                } else if (e.target.name === 'monitor-intent') {
+                    updateMonitorIntentSelection(e.target.value);
+                }
+            });
+        });
     }
-    
+
+    // 更新目标元素选择的视觉反馈
+    function updateTargetElementSelection(selectedIndex) {
+        console.log('Updating target element selection to index:', selectedIndex);
+
+        // 更新所有选项的背景色
+        const targetOptions = popover.querySelectorAll('div[style*="margin: 6px 0"]');
+        targetOptions.forEach((option, index) => {
+            if (index.toString() === selectedIndex) {
+                // 选中的选项用蓝色背景
+                option.style.background = '#f0f8ff';
+                option.style.borderColor = '#007bff';
+            } else {
+                // 未选中的选项用灰色背景
+                option.style.background = '#f9f9f9';
+                option.style.borderColor = '#e0e0e0';
+            }
+        });
+    }
+
+    // 更新监控类型选择的视觉反馈
+    function updateMonitorIntentSelection(selectedValue) {
+        console.log('Updating monitor intent selection to:', selectedValue);
+
+        // 找到所有监控类型的label
+        const intentLabels = popover.querySelectorAll('input[name="monitor-intent"]');
+        intentLabels.forEach(radio => {
+            const label = radio.closest('label');
+            if (label) {
+                if (radio.value === selectedValue) {
+                    // 选中的选项加粗并添加背景色
+                    label.style.fontWeight = 'bold';
+                    label.style.backgroundColor = '#f0f8ff';
+                    label.style.padding = '8px';
+                    label.style.borderRadius = '4px';
+                    label.style.border = '1px solid #007bff';
+                } else {
+                    // 未选中的选项恢复正常样式
+                    label.style.fontWeight = 'normal';
+                    label.style.backgroundColor = 'transparent';
+                    label.style.padding = '0';
+                    label.style.borderRadius = '0';
+                    label.style.border = 'none';
+                }
+            }
+        });
+    }
+
+    // 获取父容器选项
+    function getParentContainerOptions(element) {
+        const options = [];
+        let current = element;
+        let depth = 0;
+        const maxDepth = 5; // 最多向上查找5层
+
+        while (current && depth < maxDepth) {
+            const tagName = current.tagName.toLowerCase();
+
+            // 获取更好的文本预览
+            let textPreview = '';
+            if (current.textContent) {
+                const text = current.textContent.trim();
+                if (text.length > 100) {
+                    textPreview = text.substring(0, 100) + '...';
+                } else {
+                    textPreview = text;
+                }
+                // 替换换行符和多余空格
+                textPreview = textPreview.replace(/\s+/g, ' ');
+            }
+
+            const className = current.className ? ` class="${current.className.split(' ')[0]}"` : '';
+            const id = current.id ? ` id="${current.id}"` : '';
+
+            // 创建更清晰的描述
+            let description = `<${tagName}${id}${className}>`;
+            if (textPreview) {
+                description += ` "${textPreview}"`;
+            }
+
+            options.push({
+                element: current,
+                description: description,
+                isTableRow: tagName === 'tr',
+                isListItem: tagName === 'li',
+                isContainer: ['div', 'section', 'article'].includes(tagName) && current.children.length > 1
+            });
+
+            current = current.parentElement;
+            depth++;
+
+            // 如果到达body或html，停止
+            if (!current || tagName === 'body' || tagName === 'html') {
+                break;
+            }
+        }
+
+        return options;
+    }
+
     // 隐藏弹窗
     function hidePopover() {
         if (popover) {
             popover.remove();
             popover = null;
         }
-        
+
         // 弹窗已移除，事件监听器会自动清理
     }
     
@@ -296,15 +473,28 @@
             return;
         }
 
+        // 获取用户选择的目标元素
+        let targetElement = selectedElement;
+        const selectedTarget = popover.querySelector('input[name="target-element"]:checked');
+        if (selectedTarget) {
+            const parentOptions = getParentContainerOptions(selectedElement);
+            const targetIndex = parseInt(selectedTarget.value);
+            if (parentOptions[targetIndex]) {
+                targetElement = parentOptions[targetIndex].element;
+                console.log('User selected parent element:', targetElement);
+            }
+        }
+
         const intent = selectedIntent.value;
         console.log('User selected intent:', intent);
+        console.log('Target element:', targetElement);
 
         // 显示加载状态
         showLoadingState();
 
         try {
             // 使用AI生成选择器
-            const result = await generateAISelector(selectedElement, intent);
+            const result = await generateAISelector(targetElement, intent);
             console.log('AI Generated selectors:', result);
             sendResultToParent(result);
         } catch (error) {
@@ -342,7 +532,14 @@
 
         console.log('发送给AI的数据:', requestData);
 
-        const response = await fetch('/api/selector/ai-generate', {
+        // 确保使用正确的API地址
+        const apiUrl = window.location.origin.includes('localhost:8000')
+            ? 'http://localhost:8000/api/selector/ai-generate'
+            : '/api/selector/ai-generate';
+
+        console.log('API URL:', apiUrl);
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
