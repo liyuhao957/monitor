@@ -18,6 +18,9 @@ export interface Task {
   notification_title?: string;
   notification: any; // You might want to type this more strictly
   notification_template?: string;
+  ai_analysis_enabled: boolean;
+  ai_description?: string;
+  ai_extraction_rules?: Record<string, string> | null;
 }
 
 export interface TelegramNotification {
@@ -36,12 +39,42 @@ export interface Notification {
   feishu: FeishuNotification;
 }
 
+export interface AIPreviewRequest {
+  task_name: string;
+  task_url: string;
+  ai_description: string;
+  page_content: string;
+}
+
+export interface AIPreviewResponse {
+  success: boolean;
+  title?: string;
+  content?: string;
+  summary?: string;
+  extraction_rules?: Record<string, string>;
+  error?: string;
+}
+
 export interface RuleInfo {
   id: string;
   name: string;
   description: string;
   example: string;
   needs_value: boolean;
+}
+
+export interface ContentFetchRequest {
+  name: string;
+  url: string;
+  rule: string;
+}
+
+export interface ContentFetchResponse {
+  success: boolean;
+  content: string;
+  content_preview: string;
+  content_length: number;
+  error: string;
 }
 
 export const taskService = {
@@ -80,4 +113,16 @@ export const settingsService = {
   getExtractionRules() {
     return apiClient.get<RuleInfo[]>('/settings/rules');
   }
-}; 
+};
+
+export const aiService = {
+  previewNotification(request: AIPreviewRequest) {
+    return apiClient.post<AIPreviewResponse>('/ai/preview', request);
+  }
+};
+
+export const contentService = {
+  fetchContent(request: ContentFetchRequest) {
+    return apiClient.post<ContentFetchResponse>('/content/fetch', request);
+  }
+};

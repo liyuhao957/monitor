@@ -24,6 +24,8 @@ from app.api import tasks, logs, settings as api_settings
 from app.api.tasks import router as tasks_router
 from app.api.settings import router as settings_router
 from app.api.selector import router as selector_router
+from app.api.ai_preview import router as ai_preview_router
+from app.api.content import router as content_router
 from app.utils.page_loader import PageLoader
 from loguru import logger
 
@@ -115,6 +117,8 @@ app.include_router(tasks_router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(logs.router, prefix="/api/logs", tags=["Logs"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(selector_router, prefix="/api/selector", tags=["Selector"])
+app.include_router(ai_preview_router, prefix="/api/ai", tags=["AI Preview"])
+app.include_router(content_router, prefix="/api/content", tags=["Content"])
 
 # --- Root Endpoint ---
 @app.get("/")

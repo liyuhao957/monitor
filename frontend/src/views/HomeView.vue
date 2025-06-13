@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { taskService, settingsService, type Task, type Notification, type RuleInfo } from '@/services/api';
+import { taskService, settingsService, aiService, contentService, type Task, type Notification, type RuleInfo, type AIPreviewRequest, type ContentFetchRequest } from '@/services/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { QuestionFilled } from '@element-plus/icons-vue';
 
@@ -19,6 +19,16 @@ const ruleValue = ref('');
 const notificationPresets = ref<Record<string, string>>({});
 const selectedPresetKey = ref('');
 const customTemplate = ref('');
+
+// AI预览相关状态
+const isGeneratingAI = ref(false);
+const aiPreviewError = ref('');
+
+// 内容获取相关状态
+const isFetchingContent = ref(false);
+const fetchedContent = ref('');
+const contentPreview = ref('');
+const contentFetchError = ref('');
 
 const dialogTitle = computed(() => (isEditMode.value ? '编辑任务' : '新建任务'));
 
@@ -63,6 +73,9 @@ const openCreateDialog = () => {
     screenshot: false,
     notification_title: '',
     notification_template: 'default',
+    ai_analysis_enabled: false,
+    ai_description: '',
+    ai_extraction_rules: null,
     notification: {
       telegram: { enabled: false, bot_token: '', chat_id: '' },
       feishu: { enabled: false, webhook: '' }
@@ -75,6 +88,13 @@ const openCreateDialog = () => {
   // Set initial state for create
   selectedPresetKey.value = 'default';
   customTemplate.value = notificationPresets.value['default'] || '';
+
+  // 重置内容获取状态
+  fetchedContent.value = '';
+  contentPreview.value = '';
+  contentFetchError.value = '';
+  aiPreviewError.value = '';
+
   dialogVisible.value = true;
 };
 
@@ -206,6 +226,106 @@ const handleDelete = (taskName: string) => {
   });
 };
 
+const fetchPageContent = async () => {
+  if (!form.value.name || !form.value.url) {
+    ElMessage.error('请先填写任务名称和URL');
+    return;
+  }
+
+  // 构建提取规则
+  const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
+  let rule = '';
+  if (selectedRule) {
+    if (selectedRule.needs_value) {
+      rule = `${selectedRule.id}:${ruleValue.value}`;
+    } else {
+      rule = selectedRule.id;
+    }
+  } else {
+    rule = ruleValue.value;
+  }
+
+  if (!rule) {
+    ElMessage.error('请先设置提取规则');
+    return;
+  }
+
+  isFetchingContent.value = true;
+  contentFetchError.value = '';
+
+  try {
+    const request: ContentFetchRequest = {
+      name: form.value.name,
+      url: form.value.url,
+      rule: rule
+    };
+
+    const response = await contentService.fetchContent(request);
+
+    if (response.data.success && response.data.content) {
+      fetchedContent.value = response.data.content;
+      contentPreview.value = response.data.content_preview;
+      ElMessage.success(`页面内容获取成功！(${response.data.content_length} 字符)`);
+    } else {
+      contentFetchError.value = response.data.error || '获取页面内容失败';
+      ElMessage.error(contentFetchError.value);
+    }
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.error || '获取页面内容请求失败';
+    contentFetchError.value = errorMsg;
+    ElMessage.error(errorMsg);
+  } finally {
+    isFetchingContent.value = false;
+  }
+};
+
+const generateAIPreview = async () => {
+  if (!form.value.name || !form.value.url || !form.value.ai_description) {
+    ElMessage.error('请先填写任务名称、URL和监控描述');
+    return;
+  }
+
+  if (!fetchedContent.value) {
+    ElMessage.error('请先获取页面内容');
+    return;
+  }
+
+  isGeneratingAI.value = true;
+  aiPreviewError.value = '';
+
+  try {
+    const request: AIPreviewRequest = {
+      task_name: form.value.name,
+      task_url: form.value.url,
+      ai_description: form.value.ai_description,
+      page_content: fetchedContent.value
+    };
+
+    const response = await aiService.previewNotification(request);
+
+    if (response.data.success && response.data.content) {
+      customTemplate.value = response.data.content;
+      selectedPresetKey.value = 'custom';  // 自动切换到自定义模板
+
+      // 保存AI生成的提取规则
+      if (response.data.extraction_rules && form.value) {
+        form.value.ai_extraction_rules = response.data.extraction_rules;
+      }
+
+      ElMessage.success('AI模板生成成功！');
+    } else {
+      aiPreviewError.value = response.data.error || 'AI分析失败';
+      ElMessage.error(aiPreviewError.value);
+    }
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.error || 'AI预览请求失败';
+    aiPreviewError.value = errorMsg;
+    ElMessage.error(errorMsg);
+  } finally {
+    isGeneratingAI.value = false;
+  }
+};
+
 watch(selectedPresetKey, (newKey) => {
   if (newKey && newKey !== 'custom' && notificationPresets.value[newKey]) {
     customTemplate.value = notificationPresets.value[newKey];
@@ -244,9 +364,12 @@ onMounted(() => {
         <el-table-column prop="url" label="URL" />
         <el-table-column prop="frequency" label="频率" width="80" />
         <el-table-column prop="rule" label="提取规则" />
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '运行中' : '已禁用' }}</el-tag>
+            <div>
+              <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '运行中' : '已禁用' }}</el-tag>
+              <el-tag v-if="row.ai_analysis_enabled" type="warning" size="small" style="margin-left: 4px;">AI</el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150">
@@ -297,7 +420,89 @@ onMounted(() => {
           <el-form-item label="开启截图">
             <el-switch v-model="form.screenshot" />
           </el-form-item>
+
+          <el-divider>AI智能通知</el-divider>
+
           <el-form-item>
+            <template #label>
+              <span>
+                启用AI智能通知
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div>
+                      启用后，AI将分析内容变化并生成简洁美观的通知，<br />
+                      而不是发送原始的HTML内容摘要。<br />
+                      需要配置OPENAI_API_KEY环境变量。
+                    </div>
+                  </template>
+                  <el-icon><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <el-switch v-model="form.ai_analysis_enabled" />
+          </el-form-item>
+
+          <el-form-item
+            v-if="form.ai_analysis_enabled"
+            label="监控描述"
+          >
+            <el-input
+              v-model="form.ai_description"
+              type="textarea"
+              :rows="3"
+              placeholder="请描述你想从变化中提取什么信息，例如：我想监控版本号变化、下载链接更新、支持规范变化"
+            />
+            <div class="form-item-help">
+              <p>用自然语言描述你关心的变化内容，AI将据此生成针对性的通知。</p>
+            </div>
+
+            <!-- 获取页面内容步骤 -->
+            <div style="margin-top: 15px;">
+              <div style="margin-bottom: 10px;">
+                <span style="font-weight: 500; color: #409EFF;">步骤1: 获取页面内容</span>
+              </div>
+              <el-button
+                type="info"
+                :loading="isFetchingContent"
+                @click="fetchPageContent"
+                :disabled="!form.name || !form.url"
+                style="margin-right: 10px;"
+              >
+                <span v-if="isFetchingContent">获取中...</span>
+                <span v-else>📄 获取页面内容</span>
+              </el-button>
+
+              <!-- 内容预览 -->
+              <div v-if="contentPreview" style="margin-top: 10px; padding: 10px; background-color: #f5f7fa; border-radius: 4px; border: 1px solid #dcdfe6;">
+                <div style="font-size: 12px; color: #909399; margin-bottom: 5px;">内容预览:</div>
+                <div style="font-size: 13px; color: #606266;">{{ contentPreview }}</div>
+              </div>
+
+              <div v-if="contentFetchError" class="ai-error-message">
+                ❌ {{ contentFetchError }}
+              </div>
+            </div>
+
+            <!-- 生成AI模板步骤 -->
+            <div style="margin-top: 15px;">
+              <div style="margin-bottom: 10px;">
+                <span style="font-weight: 500; color: #409EFF;">步骤2: 生成AI模板</span>
+              </div>
+              <el-button
+                type="primary"
+                :loading="isGeneratingAI"
+                @click="generateAIPreview"
+                :disabled="!form.name || !form.url || !form.ai_description || !fetchedContent"
+              >
+                <span v-if="isGeneratingAI">生成中...</span>
+                <span v-else>🤖 生成AI模板预览</span>
+              </el-button>
+              <div v-if="aiPreviewError" class="ai-error-message">
+                ❌ {{ aiPreviewError }}
+              </div>
+            </div>
+          </el-form-item>
+          <el-form-item v-if="!form.ai_analysis_enabled">
             <template #label>
               <span>
                 通知模板
@@ -323,14 +528,38 @@ onMounted(() => {
               <el-option label="-- 自定义模板 --" value="custom" />
             </el-select>
           </el-form-item>
-          
-          <el-form-item>
+
+          <el-form-item v-if="!form.ai_analysis_enabled">
             <el-input
               v-model="customTemplate"
               type="textarea"
               :rows="10"
               placeholder="选择预设模板以预览，或选择自定义以编辑"
               :disabled="selectedPresetKey !== 'custom'"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="form.ai_analysis_enabled">
+            <template #label>
+              <span>
+                AI生成的通知模板
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div>
+                      这里显示AI根据你的监控描述生成的通知模板。<br />
+                      你可以查看和编辑AI生成的内容。<br />
+                      如果AI分析失败，将使用这里的内容作为通知模板。
+                    </div>
+                  </template>
+                  <el-icon><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <el-input
+              v-model="customTemplate"
+              type="textarea"
+              :rows="8"
+              placeholder="AI将根据你的监控描述自动生成通知模板..."
             />
           </el-form-item>
 
@@ -424,5 +653,14 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.5;
   margin-top: 4px;
+}
+.ai-error-message {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #fef0f0;
+  border-radius: 4px;
+  border: 1px solid #fbc4c4;
 }
 </style>

@@ -33,6 +33,9 @@ class Task(BaseModel):
     notification: Optional[Notification] = None
     notification_template: Optional[str] = None
     storage_strategy: str = "file"
+    ai_analysis_enabled: bool = False
+    ai_description: Optional[str] = None
+    ai_extraction_rules: Optional[Dict[str, str]] = None  # AI生成的字段提取规则
 
     model_config = {
         "json_schema_extra": {

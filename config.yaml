@@ -26,6 +26,9 @@ tasks:
       webhook: https://open.feishu.cn/open-apis/bot/v2/hook/1502988b-7bd9-4457-aab8-4386901eeb4f
   notification_template: default
   storage_strategy: file
+  ai_analysis_enabled: false
+  ai_description: null
+  ai_extraction_rules: null
 - name: 测试
   url: https://www.time163.com/
   frequency: 1m
@@ -36,6 +39,55 @@ tasks:
   notification: null
   notification_template: default
   storage_strategy: file
+  ai_analysis_enabled: false
+  ai_description: null
+  ai_extraction_rules: null
+- name: 华为快应用加载器监控
+  url: https://developer.huawei.com/consumer/cn/doc/Tools-Library/quickapp-ide-download-0000001101172926
+  frequency: 1m
+  rule: css:#ZH-CN_TOPIC_0000001101172926__li16222518142
+  enabled: false
+  screenshot: true
+  notification_title: 华为
+  notification: null
+  notification_template: default
+  storage_strategy: file
+  ai_analysis_enabled: true
+  ai_description: 我只想监控华为快应用加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：版本号、规范版本、发现时间、下载地址。请忽略历史版本列表的变化，只关注最新版本的变化。通知格式要求：使用表格、包含emoji、简洁美观。
+  ai_extraction_rules: null
+- name: 荣耀调试器
+  url: https://developer.honor.com/cn/doc/guides/101380
+  frequency: 1m
+  rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
+  enabled: true
+  screenshot: true
+  notification_title: 荣耀
+  notification: null
+  notification_template: '⭐ **荣耀调试器版本更新提醒** ⭐\n\n| 项目 | 旧版本 | 新版本 |\n| :-- | :--:
+    | :--: |\n| 🎮 荣耀快应用引擎 | {{ old_quick_engine_version or ''-'' }} | **{{ new_quick_engine_version
+    }}** |\n| 🚀 荣耀引擎 | {{ old_honor_engine_version or ''-'' }} | **{{ new_honor_engine_version
+    }}** |\n| 🤝 快应用联盟平台 | {{ old_union_platform_version or ''-'' }} | **{{ new_union_platform_version
+    }}** |\n| 🛠 调试器版本 | {{ old_debugger_version or ''-'' }} | **{{ new_debugger_version
+    }}** |\n| 🔗 下载地址 | \- | [点击下载]({{ new_download_link }}) |\n\n{% if new_features
+    %}### 📝 版本功能\n{{ new_features | replace(''。'', ''。\n- '') }}\n{% endif %}\n\n{%
+    if screenshot_url %}📸 [查看截图]({{ screenshot_url }})\n{% endif %}\n\n来源: [{{ url
+    }}]({{ url }})'
+  storage_strategy: file
+  ai_analysis_enabled: true
+  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
+  ai_extraction_rules:
+    old_quick_engine_version: ^([0-9]+\.[0-9]+\.[0-9]+)
+    new_quick_engine_version: ^([0-9]+\.[0-9]+\.[0-9]+)
+    old_honor_engine_version: ^\d+\.\d+\.\d+\s+([0-9]+)
+    new_honor_engine_version: ^\d+\.\d+\.\d+\s+([0-9]+)
+    old_union_platform_version: ^\d+\.\d+\.\d+\s+[0-9]+\s+([0-9]+)
+    new_union_platform_version: ^\d+\.\d+\.\d+\s+[0-9]+\s+([0-9]+)
+    old_download_link: <a\s+href="([^"]+)"
+    new_download_link: <a\s+href="([^"]+)"
+    old_debugger_version: </a>\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)
+    new_debugger_version: </a>\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)
+    old_features: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\s*(.+)$'
+    new_features: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\s*(.+)$'
 notification_presets:
   default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{\
     \ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】**\
