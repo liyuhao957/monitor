@@ -1,3 +1,7 @@
+api_settings:
+  deepseek_api_key: sk-33c4b6f409f149cf89139fb4c4900439
+  deepseek_base_url: https://api.deepseek.com
+  deepseek_model: deepseek-reasoner
 default_notification:
   enabled: true
   telegram:
@@ -59,53 +63,59 @@ tasks:
   url: https://developer.honor.com/cn/doc/guides/101380
   frequency: 1m
   rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
-  enabled: true
-  screenshot: true
+  enabled: false
+  screenshot: false
   notification_title: 荣耀
   notification: null
-  notification_template: '🚨 **检测到版本更新！**
+  notification_template: '📢 **{{ task_name }} 检测到新版本发布！**
 
 
-    | 字段 | 新版本 |
-
-    | --- | --- |
-
-    | 荣耀快应用引擎 | `{{ quickapp_engine_ver }}` |
-
-    | 荣耀引擎 | `{{ honor_engine_ver }}` |
-
-    | 联盟平台 | `{{ union_platform_ver }}` |
-
-    | 调试器版本 | `{{ new_debugger_version }}` |
-
-    | 下载地址 | [点击下载]({{ download_url }}) |
+    🔗 [监控页面]({{ url }})
 
 
-    📋 **版本功能**
+    | 字段 | 值 |
 
-    {% for sentence in new_features.split(''。'') %}{% if sentence.strip() %}• {{ sentence.strip()
-    }}。{% endif %}{% endfor %}
+    |------|------|
+
+    | 🚀 荣耀快应用引擎版本号 | {{ honor_quickapp_engine_version }} |
+
+    | ⚙️ 荣耀引擎版本号 | {{ honor_engine_version }} |
+
+    | 🤝 快应用联盟平台版本号 | {{ quickapp_alliance_version }} |
+
+    | 📥 下载地址 | [点击下载]({{ download_url }}) |
+
+    | 🛠️ 调试器版本号 | {{ debugger_version }} |
 
 
-    {% if version_changed %}🆚 历史调试器版本：`{{ old_debugger_version }}`
+    ✨ **版本功能**：
 
-    {% endif %}
+    {% set features = version_features.split(''新增：'') %}
 
-    {% if screenshot_url %}📸 [查看截图]({{ screenshot_url }})
+    {% for item in features if item.strip() %}
+
+    {% set clean_item = item.replace(''优化：'', '''') %}
+
+    - {{ clean_item.strip() }}
+
+    {% endfor %}
+
+
+    {% if screenshot_url %}
+
+    📸 截图：[查看截图]({{ screenshot_url }})
 
     {% endif %}'
   storage_strategy: file
   ai_analysis_enabled: true
   ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
   ai_extraction_rules:
-    quickapp_engine_ver: 从 new_summary 开头提取快应用引擎版本号：^\s*V?(\d+\.\d+\.\d+)
-    honor_engine_ver: 从 new_summary 中提取荣耀引擎版本号（位于快应用引擎版本号之后的数字）：^\s*V?\d+\.\d+\.\d+\s+(\d+)
-    union_platform_ver: 从 new_summary 中提取联盟平台版本号（第三段数字）：^\s*V?\d+\.\d+\.\d+\s+\d+\s+(\d+)
-    download_url: 从 new_summary 中提取 APK 下载链接：href="([^"]+\.apk)"
-    new_debugger_version: 从 new_summary 中提取调试器版本号（位于 </a> 之后）：</a>\s*V?(\d+\.\d+\.\d+\.\d+)
-    new_features: 从 new_summary 中提取调试器版本号之后的全部内容作为功能描述：\d+\.\d+\.\d+\.\d+\s*(.*)
-    old_debugger_version: 从 old_summary 中提取调试器版本号：</a>\s*V?(\d+\.\d+\.\d+\.\d+)
-    version_changed: 当 new_debugger_version != old_debugger_version 时返回 true，否则 false
+    honor_quickapp_engine_version: 正则捕获组1：^(\S+)
+    honor_engine_version: 正则捕获组2：^\S+\s+(\S+)
+    quickapp_alliance_version: 正则捕获组3：^\S+\s+\S+\s+(\S+)
+    download_url: 从<a>标签提取href属性：<a\s+href="(.*?)"
+    debugger_version: 正则捕获组4：<a[^>]+>点击下载<\/a>\s+(\S+)
+    version_features: 正则捕获组5：<a[^>]+>点击下载<\/a>\s+\S+\s+(.*)$
 notification_presets:
   default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{\
     \ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】**\

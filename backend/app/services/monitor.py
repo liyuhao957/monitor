@@ -13,7 +13,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 
 from app.core.config import Task, settings
 from app.services import storage, notifier
-from app.services.ai_notifier import analyze_notification_content
+from app.services.ai_notifier import analyze_notification_content_change
 from app.services.content_parser import get_content_parser
 from jinja2 import Template
 

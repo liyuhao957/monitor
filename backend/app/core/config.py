@@ -17,6 +17,11 @@ class FeishuNotification(BaseModel):
     enabled: bool = False
     webhook: Optional[HttpUrl] = None
 
+class ApiSettings(BaseModel):
+    deepseek_api_key: Optional[str] = None
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-reasoner"
+
 class Notification(BaseModel):
     enabled: bool = True
     telegram: TelegramNotification = TelegramNotification()
@@ -63,6 +68,7 @@ class Task(BaseModel):
     }
 
 class Settings(BaseModel):
+    api_settings: Optional[ApiSettings] = Field(default_factory=ApiSettings)
     default_notification: Notification = Field(default_factory=Notification)
     tasks: List[Task] = []
     notification_presets: Optional[Dict[str, str]] = None

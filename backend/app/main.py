@@ -109,6 +109,8 @@ app.add_middleware(
 )
 
 # --- Mount Static Files ---
+# Ensure screenshots directory exists
+SCREENSHOTS_DIR.mkdir(exist_ok=True)
 app.mount("/screenshots", StaticFiles(directory=SCREENSHOTS_DIR), name="screenshots")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent.parent / "static"), name="static")
 

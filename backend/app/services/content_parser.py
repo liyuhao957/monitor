@@ -95,13 +95,17 @@ class ContentParser:
         
         # 执行正则匹配
         try:
-            match = re.search(regex_pattern, content, re.IGNORECASE)
+            match = re.search(regex_pattern, content, re.IGNORECASE | re.DOTALL)
             if match:
                 # 如果有捕获组，返回第一个捕获组
                 if match.groups():
-                    return match.group(1)
+                    result = match.group(1)
                 else:
-                    return match.group(0)
+                    result = match.group(0)
+
+                # 兜底清理：移除明显的HTML标签残留
+                result = self._clean_html_residue(result)
+                return result
             else:
                 logger.debug(f"正则表达式 {regex_pattern} 在内容中未找到匹配")
                 return None
@@ -131,10 +135,10 @@ class ContentParser:
     def _extract_current_time(self, rule: str) -> str:
         """
         提取当前时间
-        
+
         Args:
             rule: 时间格式规则
-            
+
         Returns:
             格式化的当前时间字符串
         """
@@ -146,12 +150,36 @@ class ContentParser:
                 if format_start > 9 and format_end > format_start:
                     time_format = rule[format_start:format_end]
                     return datetime.now().strftime(time_format)
-            
+
             # 默认格式
             return datetime.now().strftime('%Y-%m-%d %H:%M')
         except Exception as e:
             logger.error(f"时间提取错误: {e}")
             return datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    def _clean_html_residue(self, text: str) -> str:
+        """
+        兜底清理：移除明显的HTML标签残留
+
+        Args:
+            text: 待清理的文本
+
+        Returns:
+            清理后的文本
+        """
+        if not text:
+            return text
+
+        # 移除完整的HTML标签
+        text = re.sub(r'<[^>]+>', '', text)
+
+        # 移除HTML实体
+        text = re.sub(r'&[a-zA-Z0-9#]+;', '', text)
+
+        # 清理多余的空白字符
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        return text
 
 # 全局解析器实例
 _content_parser: Optional[ContentParser] = None

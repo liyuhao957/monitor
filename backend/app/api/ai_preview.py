@@ -44,15 +44,13 @@ async def preview_ai_notification(request: AIPreviewRequest):
         )
         
         # 使用真实的页面内容
-        # 为了让AI能够分析变化，我们创建一个轻微修改的版本作为"变化后"的内容
-        old_content = request.page_content
-        # 简单地在内容末尾添加一个标记来模拟变化，AI会基于真实内容生成提取规则
-        new_content = request.page_content + " [模拟变化]"
+        # AI 直接分析页面内容结构，生成适合的提取规则
+        page_content = request.page_content
         
         logger.info(f"预览AI分析 - 任务: {request.task_name}, 描述: {request.ai_description}")
-        
-        # 调用AI分析
-        result = analyze_notification_content(temp_task, old_content, new_content)
+
+        # 调用AI分析，直接基于页面内容结构生成提取规则
+        result = analyze_notification_content(temp_task, page_content)
         
         if result:
             logger.info(f"AI预览成功 - 任务: {request.task_name}")
