@@ -20,35 +20,8 @@ def test_improved_template():
         ai_analysis_enabled=True
     )
     
-    # 模拟内容变化
-    old_content = """
-    <tr>
-        <td>荣耀快应用引擎版本号</td>
-        <td>V15.1.1.301</td>
-    </tr>
-    <tr>
-        <td>荣耀引擎版本号</td>
-        <td>V15.1.1.301</td>
-    </tr>
-    <tr>
-        <td>快应用联盟平台版本号</td>
-        <td>1121</td>
-    </tr>
-    <tr>
-        <td>下载地址</td>
-        <td><a href="https://example.com/old.apk">下载</a></td>
-    </tr>
-    <tr>
-        <td>调试器版本号</td>
-        <td>V15.1.1.301</td>
-    </tr>
-    <tr>
-        <td>版本功能</td>
-        <td>支持新功能A。支持新功能B。修复已知问题。</td>
-    </tr>
-    """
-    
-    new_content = """
+    # 模拟页面内容
+    page_content = """
     <tr>
         <td>荣耀快应用引擎版本号</td>
         <td>V15.2.1.305</td>
@@ -78,8 +51,8 @@ def test_improved_template():
     try:
         print("🧪 测试改进后的AI模板生成...")
         
-        # 调用AI生成模板
-        result = analyze_notification_content(task, old_content, new_content)
+        # 调用AI生成模板（使用页面内容进行结构分析）
+        result = analyze_notification_content(task, page_content)
 
         if result:
             print("✅ AI模板生成成功!")

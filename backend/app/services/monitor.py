@@ -1,11 +1,10 @@
 import asyncio
-import difflib
 import logging
 import re
 import html
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from urllib.parse import quote
 
 from lxml import etree, html as lxml_html
@@ -13,7 +12,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 
 from app.core.config import Task, settings
 from app.services import storage, notifier
-from app.services.ai_notifier import analyze_notification_content_change
+
 from app.services.content_parser import get_content_parser
 from jinja2 import Template
 
@@ -176,7 +175,12 @@ async def run_task(task: Task):
                     "old_summary": summary_old,
                     "new_summary": summary_new,
                     "screenshot_url": screenshot_url or None,
-                    "screenshot_path": screenshot_path or "未启用"
+                    "screenshot_path": screenshot_path or "未启用",
+                    # 通用时间变量
+                    "now": datetime.now,  # 时间函数，可用于 now().strftime('%Y-%m-%d')
+                    "current_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "current_date": datetime.now().strftime('%Y-%m-%d'),
+                    "timestamp": int(datetime.now().timestamp())
                 }
 
                 # AI智能通知处理

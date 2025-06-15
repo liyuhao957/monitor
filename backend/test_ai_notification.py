@@ -27,16 +27,8 @@ async def test_ai_notification():
         ai_description="我想监控V15.1.1.301版本的更新，包括版本号变化、下载链接更新、支持规范变化"
     )
     
-    # 模拟内容变化
-    old_content = """
-    <tr>
-        <td>V15.0.1.303</td>
-        <td><a href="https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/ac/v3/NdSvoI1ZQjKu0y7TZC31Gg/QuickAPP-newly-product-release-loader-15.1.1.301.apk">HwQuickApp_Loader_Phone_V15.1.1.301.apk</a></td>
-        <td>（支持1121规范的调试）</td>
-    </tr>
-    """
-    
-    new_content = """
+    # 模拟页面内容
+    page_content = """
     <tr>
         <td>V15.0.1.304</td>
         <td><a href="https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/ac/v3/NdSvoI1ZQjKu0y7TZC31Gg/QuickAPP-newly-product-release-loader-15.1.1.302.apk">HwQuickApp_Loader_Phone_V15.1.1.302.apk</a></td>
@@ -50,8 +42,8 @@ async def test_ai_notification():
     print("\n" + "="*50)
 
     try:
-        # 调用AI生成模板
-        result = analyze_notification_content(task, old_content, new_content)
+        # 调用AI生成模板（使用页面内容进行结构分析）
+        result = analyze_notification_content(task, page_content)
 
         if result:
             print("✅ AI模板生成成功!")

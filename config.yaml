@@ -49,82 +49,135 @@ tasks:
 - name: 华为快应用加载器监控
   url: https://developer.huawei.com/consumer/cn/doc/Tools-Library/quickapp-ide-download-0000001101172926
   frequency: 1m
-  rule: css:#ZH-CN_TOPIC_0000001101172926__li16222518142
-  enabled: false
-  screenshot: true
+  rule: xpath://*[@id="ZH-CN_TOPIC_0000001101172926__li16222518142"]
+  enabled: true
+  screenshot: false
   notification_title: 华为
   notification: null
-  notification_template: default
-  storage_strategy: file
-  ai_analysis_enabled: true
-  ai_description: 我只想监控华为快应用加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：版本号、规范版本、发现时间、下载地址。请忽略历史版本列表的变化，只关注最新版本的变化。通知格式要求：使用表格、包含emoji、简洁美观。
-  ai_extraction_rules: null
-- name: 荣耀调试器
-  url: https://developer.honor.com/cn/doc/guides/101380
-  frequency: 1m
-  rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
-  enabled: false
-  screenshot: false
-  notification_title: 荣耀
-  notification: null
-  notification_template: '📢 **{{ task_name }} 检测到新版本发布！**
+  notification_template: '**{{ task_name }} 检测到新版本！**
+
+    🔍 监控地址：[点击查看]({{ url }})
+
+    📅 检测时间：{{ current_time }}
 
 
-    🔗 [监控页面]({{ url }})
+    | 🔖 项目       | 📝 内容                          |
 
+    |--------------|--------------------------------|
 
-    | 字段 | 值 |
+    | 版本号       | {{ new_version }}              |
 
-    |------|------|
+    | 规范版本     | {{ spec_version }}             |
 
-    | 🚀 荣耀快应用引擎版本号 | {{ honor_quickapp_engine_version }} |
+    | 发现时间     | {{ current_time }}             |
 
-    | ⚙️ 荣耀引擎版本号 | {{ honor_engine_version }} |
-
-    | 🤝 快应用联盟平台版本号 | {{ quickapp_alliance_version }} |
-
-    | 📥 下载地址 | [点击下载]({{ download_url }}) |
-
-    | 🛠️ 调试器版本号 | {{ debugger_version }} |
-
-
-    ✨ **版本功能**：
-
-    {% set features = version_features.split(''新增：'') %}
-
-    {% for item in features if item.strip() %}
-
-    {% set clean_item = item.replace(''优化：'', '''') %}
-
-    - {{ clean_item.strip() }}
-
-    {% endfor %}
+    | 下载地址     | [⬇️ 点击下载]({{ download_url }}) |
 
 
     {% if screenshot_url %}
 
-    📸 截图：[查看截图]({{ screenshot_url }})
+    🖼️ [版本更新截图]({{ screenshot_url }})
+
+    {% endif %}'
+  storage_strategy: file
+  ai_analysis_enabled: true
+  ai_description: 我只想监控华为快应用加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：版本号、规范版本、发现时间、下载地址。请忽略历史版本列表的变化，只关注最新版本的变化。通知格式要求：使用表格、包含emoji、简洁美观。
+  ai_extraction_rules:
+    new_version: regex:HwQuickApp_Loader_Phone_(V\d+\.\d+\.\d+\.\d+)\.apk
+    spec_version: regex:支持(\d+)规范的调试
+    download_url: regex:href="([^"]+\.apk[^"]*)"
+- name: 荣耀调试器
+  url: https://developer.honor.com/cn/doc/guides/101380
+  frequency: 1m
+  rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
+  enabled: true
+  screenshot: false
+  notification_title: 荣耀
+  notification: null
+  notification_template: '# {{ task_name }} 检测到版本更新！
+
+
+    **监控URL:** {{ url }}
+
+
+    | 项目 | 新版本信息 |
+
+    |------|------------|
+
+    | 🚀 荣耀快应用引擎版本号 | {{ honor_fast_app_engine_version }} |
+
+    | ⚙️ 荣耀引擎版本号 | {{ honor_engine_version }} |
+
+    | 🤝 快应用联盟平台版本号 | {{ fast_app_alliance_platform_version }} |
+
+    | 📥 下载地址 | [点击下载]({{ download_url }}) |
+
+    | 🔧 调试器版本号 | {{ debugger_version }} |
+
+    | 📝 版本功能 | {{ version_features | replace(''新增：'', ''\n- 新增：'') | replace(''优化：'', ''\n- 优化：'') }} |
+
+
+    {% if screenshot_url %}
+
+    **截图:** [查看截图]({{ screenshot_url }})
 
     {% endif %}'
   storage_strategy: file
   ai_analysis_enabled: true
   ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
   ai_extraction_rules:
-    honor_quickapp_engine_version: 正则捕获组1：^(\S+)
-    honor_engine_version: 正则捕获组2：^\S+\s+(\S+)
-    quickapp_alliance_version: 正则捕获组3：^\S+\s+\S+\s+(\S+)
-    download_url: 从<a>标签提取href属性：<a\s+href="(.*?)"
-    debugger_version: 正则捕获组4：<a[^>]+>点击下载<\/a>\s+(\S+)
-    version_features: 正则捕获组5：<a[^>]+>点击下载<\/a>\s+\S+\s+(.*)$
+    honor_fast_app_engine_version: regex:^(\d+\.\d+\.\d+)
+    honor_engine_version: regex:^\d+\.\d+\.\d+\s+(\d+)
+    fast_app_alliance_platform_version: regex:^\d+\.\d+\.\d+\s+\d+\s+(\d+)
+    download_url: regex:<a href="(.*?)"
+    debugger_version: regex:</a>\s+(\d+\.\d+\.\d+\.\d+)
+    version_features: regex:\d+\.\d+\.\d+\.\d+\s+(.*)
+- name: OPPO
+  url: https://ie-activity-cn.heytapimage.com/static/minigame/CN/docs/index.html#/download/index
+  frequency: 1m
+  rule: xpath://*[@id="main"]/ul[1]
+  enabled: true
+  screenshot: false
+  notification_title: OPPO快游戏
+  notification: null
+  notification_template: '**任务名称**: {{ task_name }}
+
+    **监控URL**: {{ url }}
+
+    **检测时间**: {{ current_time }}
+
+
+    检测到荣耀加载器最新版本已更新，详细信息如下：
+
+
+    | 项目 | 值 |
+
+    |------|----|
+
+    | 🚀 OPPO引擎大版本号 | {{ engine_major_version }} |
+
+    | 🔢 OPPO引擎小版本号 | {{ engine_minor_version }} |
+
+    | ⬇️ 下载地址 | [点击下载]({{ download_url }}) |
+
+
+    {% if screenshot_url %}
+
+    **截图参考**: [查看截图]({{ screenshot_url }})
+
+    {% endif %}'
+  storage_strategy: file
+  ai_analysis_enabled: true
+  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个表格格式的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
+  ai_extraction_rules:
+    engine_minor_version: regex:(\d+)
+    download_url: regex:href="([^"]+)"
+    engine_major_version: regex:V(\d+)\.\d+\.\d+
 notification_presets:
-  default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{\
-    \ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】**\
-    \ > {{ new_summary }} {% if screenshot_url %} ---\n**\U0001F5BC️ [查看快照]({{ screenshot_url\
-    \ }})** {% endif %}"
+  default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】** > {{ new_summary }} {% if screenshot_url %} ---\n**\U0001F5BC️ [查看快照]({{ screenshot_url }})** {% endif %}"
   simple: '[监控] {{ task_name }} 发生内容变更，请及时查看。链接: {{ url }}'
   card: '**📈 {{ task_name }} - 内容变更**
 
     > {{ new_summary }}
 
-    --- - **监控页面**: [点击访问]({{ url }}) {% if screenshot_url %} - **页面快照**: [点击查看]({{
-    screenshot_url }}) {% endif %}'
+    --- - **监控页面**: [点击访问]({{ url }}) {% if screenshot_url %} - **页面快照**: [点击查看]({{ screenshot_url }}) {% endif %}'

@@ -92,7 +92,7 @@ def save_config(settings_obj: Settings, config_path: Path):
     
     # Step 3: Dump the clean Python dictionary to the YAML file.
     with open(config_path, 'w', encoding='utf-8') as f:
-        yaml.dump(config_data, f, allow_unicode=True, sort_keys=False, indent=2)
+        yaml.dump(config_data, f, allow_unicode=True, sort_keys=False, indent=2, width=float('inf'))
 
 def load_config(config_path: Path) -> Settings:
     """Loads configuration from a YAML file and validates it with Pydantic."""
