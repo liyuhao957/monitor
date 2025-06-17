@@ -16,13 +16,13 @@ const rules = ref<RuleInfo[]>([]);
 const selectedRuleId = ref('css');
 const ruleValue = ref('');
 
-const notificationPresets = ref<Record<string, string>>({});
-const selectedPresetKey = ref('');
+// Jinja2 template presets removed - only using AI-generated Python code
 const customTemplate = ref('');
 
 // AI预览相关状态
 const isGeneratingAI = ref(false);
 const aiPreviewError = ref('');
+const hasGeneratedNewAI = ref(false); // 标记是否刚刚生成了新的AI模板
 
 // 内容获取相关状态
 const isFetchingContent = ref(false);
@@ -53,14 +53,7 @@ const fetchRules = async () => {
   }
 };
 
-const fetchPresets = async () => {
-  try {
-    const response = await settingsService.getNotificationPresets();
-    notificationPresets.value = response.data;
-  } catch (error) {
-    ElMessage.error('无法加载通知模板预设');
-  }
-};
+// fetchPresets removed - only using AI-generated Python code
 
 const openCreateDialog = () => {
   isEditMode.value = false;
@@ -72,10 +65,11 @@ const openCreateDialog = () => {
     enabled: true,
     screenshot: false,
     notification_title: '',
-    notification_template: 'default',
+    // notification_template removed - only using AI-generated Python code
     ai_analysis_enabled: false,
     ai_description: '',
     ai_extraction_rules: null,
+    ai_formatter_code: null,
     notification: {
       telegram: { enabled: false, bot_token: '', chat_id: '' },
       feishu: { enabled: false, webhook: '' }
@@ -85,15 +79,15 @@ const openCreateDialog = () => {
   selectedRuleId.value = 'css';
   ruleValue.value = '';
 
-  // Set initial state for create
-  selectedPresetKey.value = 'default';
-  customTemplate.value = notificationPresets.value['default'] || '';
+  // Set initial state for create - only AI-generated templates
+  customTemplate.value = '';
 
   // 重置内容获取状态
   fetchedContent.value = '';
   contentPreview.value = '';
   contentFetchError.value = '';
   aiPreviewError.value = '';
+  hasGeneratedNewAI.value = false; // 重置AI生成标志
 
   dialogVisible.value = true;
 };
@@ -127,21 +121,52 @@ const openEditDialog = async (task: Task) => {
   }
   // --- End of rule parsing ---
 
-  // Ensure presets are loaded before setting the state
-  if (Object.keys(notificationPresets.value).length === 0) {
-    await fetchPresets();
-  }
+  // 加载AI配置状态
+  if (task.ai_analysis_enabled && task.ai_formatter_code) {
+    // 如果有AI代码，加载已保存的模板预览
+    customTemplate.value = '正在加载已保存的AI模板...';
+    
+    // 异步获取已保存的AI模板预览
+    aiService.getSavedTemplate(task.name).then(response => {
+      if (response.data.success && response.data.content) {
+        customTemplate.value = response.data.content;
+      } else {
+        const extractedFields = task.ai_extraction_rules ? Object.keys(task.ai_extraction_rules).join(', ') : '未知';
+        customTemplate.value = `✅ AI通知模板已配置
 
-  const templateValue = task.notification_template || 'default';
+📝 监控描述: ${task.ai_description || '无描述'}
 
-  if (notificationPresets.value[templateValue]) {
-    selectedPresetKey.value = templateValue;
-    customTemplate.value = notificationPresets.value[templateValue];
+📊 提取字段: ${extractedFields}
+
+💡 如需基于最新页面内容重新生成：
+1. 点击"📄 获取页面内容"
+2. 点击"🤖 生成AI模板预览"`;
+      }
+    }).catch(error => {
+      console.error('加载AI模板失败:', error);
+      const extractedFields = task.ai_extraction_rules ? Object.keys(task.ai_extraction_rules).join(', ') : '未知';
+      customTemplate.value = `✅ AI通知模板已配置
+
+📝 监控描述: ${task.ai_description || '无描述'}
+
+📊 提取字段: ${extractedFields}
+
+⚠️ 加载模板预览失败，你可以：
+1. 点击"📄 获取页面内容"
+2. 点击"🤖 生成AI模板预览"
+重新生成基于最新内容的模板。`;
+    });
   } else {
-    selectedPresetKey.value = 'custom';
-    customTemplate.value = templateValue;
+    customTemplate.value = '';
   }
-  
+
+  // 重置内容获取状态
+  fetchedContent.value = '';
+  contentPreview.value = '';
+  contentFetchError.value = '';
+  aiPreviewError.value = '';
+  hasGeneratedNewAI.value = false; // 重置AI生成标志
+
   dialogVisible.value = true;
 };
 
@@ -164,12 +189,8 @@ const handleSubmit = async () => {
   }
   // --- End of rule composition ---
   
-  // Set the correct template value before submitting
-  if (selectedPresetKey.value === 'custom') {
-    form.value.notification_template = customTemplate.value;
-  } else {
-    form.value.notification_template = selectedPresetKey.value;
-  }
+  // Only AI-generated templates - no template field needed
+  // form.notification_template removed
 
   // Data cleaning before submission
   const payload = { ...form.value };
@@ -203,6 +224,7 @@ const handleSubmit = async () => {
       ElMessage.success('任务创建成功');
     }
     dialogVisible.value = false;
+    hasGeneratedNewAI.value = false; // 重置AI生成标志
     fetchTasks();
   } catch (error: any) {
     const detail = error.response?.data?.detail || '操作失败';
@@ -305,14 +327,18 @@ const generateAIPreview = async () => {
 
     if (response.data.success && response.data.content) {
       customTemplate.value = response.data.content;
-      selectedPresetKey.value = 'custom';  // 自动切换到自定义模板
 
-      // 保存AI生成的提取规则
+      // 保存AI生成的提取规则和格式化代码
       if (response.data.extraction_rules && form.value) {
         form.value.ai_extraction_rules = response.data.extraction_rules;
       }
 
-      ElMessage.success('AI模板生成成功！');
+      if (response.data.formatter_code && form.value) {
+        form.value.ai_formatter_code = response.data.formatter_code;
+      }
+
+      hasGeneratedNewAI.value = true; // 标记刚刚生成了新的AI模板
+      ElMessage.success('AI模板生成成功！请点击"确定"按钮保存更改。');
     } else {
       aiPreviewError.value = response.data.error || 'AI分析失败';
       ElMessage.error(aiPreviewError.value);
@@ -326,16 +352,7 @@ const generateAIPreview = async () => {
   }
 };
 
-watch(selectedPresetKey, (newKey) => {
-  if (newKey && newKey !== 'custom' && notificationPresets.value[newKey]) {
-    customTemplate.value = notificationPresets.value[newKey];
-  } else if (newKey === 'custom') {
-    // Do not clear the text area when user wants to customize
-  } else {
-    // Cleared or invalid selection, maybe reset custom template
-    customTemplate.value = '';
-  }
-});
+// watch for selectedPresetKey removed - only using AI-generated templates
 
 // Watcher to clear rule value when a rule that doesn't need a value is selected
 watch(selectedRuleId, (newId) => {
@@ -347,7 +364,6 @@ watch(selectedRuleId, (newId) => {
 
 onMounted(() => {
   fetchTasks();
-  fetchPresets();
   fetchRules();
 });
 </script>
@@ -500,43 +516,35 @@ onMounted(() => {
               <div v-if="aiPreviewError" class="ai-error-message">
                 ❌ {{ aiPreviewError }}
               </div>
+              <div v-if="hasGeneratedNewAI" style="margin-top: 8px; color: #e6a23c; font-size: 12px;">
+                ⚠️ 已生成新的AI模板，请点击底部"确定"按钮保存更改
+              </div>
             </div>
           </el-form-item>
+          <!-- Jinja2 template selector removed - only using AI-generated Python code -->
           <el-form-item v-if="!form.ai_analysis_enabled">
             <template #label>
               <span>
-                通知模板
+                通知模式
                 <el-tooltip placement="top">
                   <template #content>
                     <div>
-                      选择预设模板，或选择"自定义模板"并编辑内容。<br />
-                      模板引擎已升级为 Jinja2，支持条件判断。<br />
-                      例如: <code>{% raw %}{% if screenshot_url %} [查看截图](&#123;&#123; screenshot_url &#125;&#125;) {% endif %}{% endraw %}</code>
+                      请启用AI智能通知以获得最佳体验。<br />
+                      AI会根据您的监控描述自动生成通知内容。<br />
+                      传统模板功能已移除，建议使用AI智能通知。
                     </div>
                   </template>
                   <el-icon><QuestionFilled /></el-icon>
                 </el-tooltip>
               </span>
             </template>
-            <el-select v-model="selectedPresetKey" placeholder="请选择或自定义模板" style="width: 100%;">
-              <el-option
-                v-for="(value, key) in notificationPresets"
-                :key="key"
-                :label="key"
-                :value="key"
-              />
-              <el-option label="-- 自定义模板 --" value="custom" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item v-if="!form.ai_analysis_enabled">
-            <el-input
-              v-model="customTemplate"
-              type="textarea"
-              :rows="10"
-              placeholder="选择预设模板以预览，或选择自定义以编辑"
-              :disabled="selectedPresetKey !== 'custom'"
-            />
+            <el-alert
+              title="建议启用AI智能通知"
+              type="info"
+              description="传统Jinja2模板已移除，请启用AI智能通知获得更好的体验。"
+              show-icon
+              :closable="false">
+            </el-alert>
           </el-form-item>
 
           <el-form-item v-if="form.ai_analysis_enabled">

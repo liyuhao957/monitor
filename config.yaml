@@ -1,183 +1,85 @@
 api_settings:
   deepseek_api_key: sk-33c4b6f409f149cf89139fb4c4900439
   deepseek_base_url: https://api.deepseek.com
-  deepseek_model: deepseek-reasoner
+  deepseek_model: deepseek-chat
+  openai_api_key: sk-6KwYGpsonYqWBAxrg9hEyjfEL7Bpak478TjuxCA7gf52GdvGVDfQ
+  openai_base_url: https://api.oaipro.com/v1
+  openai_model: claude-sonnet-4-20250514
+  ai_provider: openai
 default_notification:
   enabled: true
   telegram:
     enabled: false
-    bot_token: YOUR_TELEGRAM_BOT_TOKEN
-    chat_id: YOUR_TELEGRAM_CHAT_ID
+    bot_token: null
+    chat_id: null
   feishu:
     enabled: true
     webhook: https://open.feishu.cn/open-apis/bot/v2/hook/2e9f09a8-4cec-4475-a6a8-4da61c4a874c
 tasks:
-- name: V2EX-热榜
-  url: https://www.v2ex.com/?tab=hot
-  frequency: 3m
-  rule: css:span.item_title > a
-  enabled: false
-  screenshot: false
-  notification_title: v2ex的
-  notification:
-    enabled: true
-    telegram:
-      enabled: false
-      bot_token: ''
-      chat_id: ''
-    feishu:
-      enabled: true
-      webhook: https://open.feishu.cn/open-apis/bot/v2/hook/1502988b-7bd9-4457-aab8-4386901eeb4f
-  notification_template: default
-  storage_strategy: file
-  ai_analysis_enabled: false
-  ai_description: null
-  ai_extraction_rules: null
-- name: 测试
-  url: https://www.time163.com/
-  frequency: 1m
-  rule: css:#beijing-time
-  enabled: false
-  screenshot: true
-  notification_title: null
-  notification: null
-  notification_template: default
-  storage_strategy: file
-  ai_analysis_enabled: false
-  ai_description: null
-  ai_extraction_rules: null
 - name: 华为快应用加载器监控
   url: https://developer.huawei.com/consumer/cn/doc/Tools-Library/quickapp-ide-download-0000001101172926
-  frequency: 1m
+  frequency: 10m
   rule: xpath://*[@id="ZH-CN_TOPIC_0000001101172926__li16222518142"]
   enabled: true
   screenshot: false
   notification_title: 华为
   notification: null
-  notification_template: '**{{ task_name }} 检测到新版本！**
-
-    🔍 监控地址：[点击查看]({{ url }})
-
-    📅 检测时间：{{ current_time }}
-
-
-    | 🔖 项目       | 📝 内容                          |
-
-    |--------------|--------------------------------|
-
-    | 版本号       | {{ new_version }}              |
-
-    | 规范版本     | {{ spec_version }}             |
-
-    | 发现时间     | {{ current_time }}             |
-
-    | 下载地址     | [⬇️ 点击下载]({{ download_url }}) |
-
-
-    {% if screenshot_url %}
-
-    🖼️ [版本更新截图]({{ screenshot_url }})
-
-    {% endif %}'
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我只想监控华为快应用加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：版本号、规范版本、发现时间、下载地址。请忽略历史版本列表的变化，只关注最新版本的变化。通知格式要求：使用表格、包含emoji、简洁美观。
+  ai_description: 我想监控华为快应用加载器的最新版本更新,当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个合适的飞书通知，包含：版本号（V15.1.1.301类似这样）、规范版本（类似1121）、发现时间、下载地址。通知格式要求：包含emoji、简洁美观，结尾带上💡 此通知由版本监控系统自动生成
   ai_extraction_rules:
-    new_version: regex:HwQuickApp_Loader_Phone_(V\d+\.\d+\.\d+\.\d+)\.apk
-    spec_version: regex:支持(\d+)规范的调试
-    download_url: regex:href="([^"]+\.apk[^"]*)"
+    version: regex:HwQuickApp_Loader_Phone_(V\d+\.\d+\.\d+\.\d+)\.apk
+    spec_version: regex:调试运行在手机/Pad的快应用的加载器安装包：.*?（支持(\d{4})规范的调试）
+    download_url: regex:调试运行在手机/Pad的快应用的加载器安装包：<a href="([^"]+)"
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    \"\"\"\n    格式化华为快应用加载器版本更新通知\n    Args:\n    extracted_data: 提取的数据字典\n    task_info: 任务信息 (name, url, current_time等)\n    Returns:\n    str: 格式化后的通知内容\n    \"\"\"\n    try:\n        # 获取提取的数据\n        version = extracted_data.get('version', '未知版本')\n        spec_version = extracted_data.get('spec_version', '未知规范')\n        download_url = extracted_data.get('download_url', '')\n        current_time = task_info.get('current_time', '未知时间')\n\n        # 构建通知内容\n        title = \"\U0001F680 华为快应用加载器版本更新\"\n\n        content_parts = [\n            title,\n            \"\",\n            f\"\U0001F4E6 **最新版本**: {version}\",\n            f\"\U0001F527 **规范版本**: {spec_version}\",\n            f\"⏰ **发现时间**: {current_time}\",\n        ]\n\n        # 添加下载链接\n        if download_url and download_url != '未知':\n            content_parts.append(f\"\U0001F4E5 **下载地址**: [点击下载]({download_url})\")\n        else:\n            content_parts.append(\"\U0001F4E5 **下载地址**: 暂无可用链接\")\n\n        content_parts.extend([\n            \"\",\n            \"---\",\n            \"\U0001F4A1 此通知由版本监控系统自动生成\"\n        ])\n\n        return \"\\n\".join(content_parts)\n\n    except Exception as e:\n        return f\"\U0001F680 华为快应用加载器版本更新\\n\\n❌ 格式化失败: {str(e)}\\n\\n\U0001F4A1 此通知由版本监控系统自动生成\""
 - name: 荣耀调试器
   url: https://developer.honor.com/cn/doc/guides/101380
-  frequency: 1m
+  frequency: 10m
   rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
   enabled: true
   screenshot: false
   notification_title: 荣耀
   notification: null
-  notification_template: '# {{ task_name }} 检测到版本更新！
-
-
-    **监控URL:** {{ url }}
-
-
-    | 项目 | 新版本信息 |
-
-    |------|------------|
-
-    | 🚀 荣耀快应用引擎版本号 | {{ honor_fast_app_engine_version }} |
-
-    | ⚙️ 荣耀引擎版本号 | {{ honor_engine_version }} |
-
-    | 🤝 快应用联盟平台版本号 | {{ fast_app_alliance_platform_version }} |
-
-    | 📥 下载地址 | [点击下载]({{ download_url }}) |
-
-    | 🔧 调试器版本号 | {{ debugger_version }} |
-
-    | 📝 版本功能 | {{ version_features | replace(''新增：'', ''\n- 新增：'') | replace(''优化：'', ''\n- 优化：'') }} |
-
-
-    {% if screenshot_url %}
-
-    **截图:** [查看截图]({{ screenshot_url }})
-
-    {% endif %}'
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个表格格式的通知，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
+  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个适用于飞书的通知格式，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：包含emoji、简洁美观、版本功能需要排版、结尾带上💡 此通知由版本监控系统自动生成。
   ai_extraction_rules:
-    honor_fast_app_engine_version: regex:^(\d+\.\d+\.\d+)
-    honor_engine_version: regex:^\d+\.\d+\.\d+\s+(\d+)
-    fast_app_alliance_platform_version: regex:^\d+\.\d+\.\d+\s+\d+\s+(\d+)
-    download_url: regex:<a href="(.*?)"
+    quick_app_engine_version: regex:^(\d+\.\d+\.\d+\.\d+)
+    honor_engine_version: regex:^\d+\.\d+\.\d+\.\d+\s+(\d+)
+    alliance_platform_version: regex:^\d+\.\d+\.\d+\.\d+\s+\d+\s+(\d+)
+    download_url: regex:href="([^"]+)"
     debugger_version: regex:</a>\s+(\d+\.\d+\.\d+\.\d+)
-    version_features: regex:\d+\.\d+\.\d+\.\d+\s+(.*)
+    version_features: regex:</a>\s+\d+\.\d+\.\d+\.\d+\s+(.+)$
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    \"\"\"\n    格式化荣耀调试器版本更新通知\n    Args:\n    extracted_data: 提取的数据字典\n    task_info: 任务信息 (name, url, current_time等)\n    Returns:\n    str: 格式化后的通知内容\n    \"\"\"\n    try:\n        # 获取提取的数据\n        quick_app_engine_version = extracted_data.get('quick_app_engine_version', '未知')\n        honor_engine_version = extracted_data.get('honor_engine_version', '未知')\n        alliance_platform_version = extracted_data.get('alliance_platform_version', '未知')\n        download_url = extracted_data.get('download_url', '')\n        debugger_version = extracted_data.get('debugger_version', '未知')\n        version_features = extracted_data.get('version_features', '暂无功能说明')\n\n        # 获取任务信息\n        task_name = task_info.get('name', '荣耀调试器')\n        current_time = task_info.get('current_time', '')\n\n        # 构建通知内容\n        notification = f\"\U0001F527 **{task_name}版本更新**\\n\\n\"\n        notification += f\"⏰ **更新时间**: {current_time}\\n\\n\"\n        notification += f\"\U0001F4F1 **荣耀快应用引擎版本**: `{quick_app_engine_version}`\\n\"\n        notification += f\"⚙️ **荣耀引擎版本**: `{honor_engine_version}`\\n\"\n        notification += f\"\U0001F310 **快应用联盟平台版本**: `{alliance_platform_version}`\\n\"\n        notification += f\"\U0001F41B **调试器版本**: `{debugger_version}`\\n\\n\"\n\n        # 添加下载链接\n        if download_url:\n            notification += f\"\U0001F4E5 **下载地址**: [点击下载]({download_url})\\n\\n\"\n\n        # 添加版本功能\n        notification += f\"✨ **版本功能**:\\n\"\n        if version_features and version_features != '暂无功能说明':\n            # 处理版本功能文本,添加适当的格式\n            features_text = version_features.strip()\n            if features_text:\n                notification += f\"• {features_text}\\n\\n\"\n            else:\n                notification += f\"• 暂无功能说明\\n\\n\"\n        else:\n            notification += f\"• 暂无功能说明\\n\\n\"\n\n        notification += f\"\U0001F4A1 此通知由版本监控系统自动生成\"\n\n        return notification\n\n    except Exception as e:\n        return f\"\U0001F527 **荣耀调试器版本更新通知**\\n\\n❌ 格式化失败: {str(e)}\\n\\n\U0001F4A1 此通知由版本监控系统自动生成\""
 - name: OPPO
   url: https://ie-activity-cn.heytapimage.com/static/minigame/CN/docs/index.html#/download/index
-  frequency: 1m
+  frequency: 10m
   rule: xpath://*[@id="main"]/ul[1]
   enabled: true
   screenshot: false
   notification_title: OPPO快游戏
   notification: null
-  notification_template: '**任务名称**: {{ task_name }}
-
-    **监控URL**: {{ url }}
-
-    **检测时间**: {{ current_time }}
-
-
-    检测到荣耀加载器最新版本已更新，详细信息如下：
-
-
-    | 项目 | 值 |
-
-    |------|----|
-
-    | 🚀 OPPO引擎大版本号 | {{ engine_major_version }} |
-
-    | 🔢 OPPO引擎小版本号 | {{ engine_minor_version }} |
-
-    | ⬇️ 下载地址 | [点击下载]({{ download_url }}) |
-
-
-    {% if screenshot_url %}
-
-    **截图参考**: [查看截图]({{ screenshot_url }})
-
-    {% endif %}'
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个表格格式的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址。通知格式要求：使用表格、包含emoji、简洁美观、版本功能需要排版。
+  ai_description: 我只想监控OPPO小游戏调试器的最新版本更新。V9.8.0这样的是小版本号，1155这样的是大版本号，当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个适用飞书的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址。通知格式要求：包含emoji、简洁美观、结尾带上💡 此通知由版本监控系统自动生成。
   ai_extraction_rules:
-    engine_minor_version: regex:(\d+)
+    major_version: regex:^(\d+)\s+<a
+    minor_version: regex:OPPO 小游戏调试器 (V[\d.]+)
     download_url: regex:href="([^"]+)"
-    engine_major_version: regex:V(\d+)\.\d+\.\d+
-notification_presets:
-  default: "**\U0001F4C8 网页内容变更告警**\n**- 任务名称**: `{{ task_name }}` **- 监控页面**: [点击访问]({{ url }})\n--- \n**\U0001F4DD 变更内容摘要**:\n**【变更前】** > {{ old_summary }}\n**【变更后】** > {{ new_summary }} {% if screenshot_url %} ---\n**\U0001F5BC️ [查看快照]({{ screenshot_url }})** {% endif %}"
-  simple: '[监控] {{ task_name }} 发生内容变更，请及时查看。链接: {{ url }}'
-  card: '**📈 {{ task_name }} - 内容变更**
-
-    > {{ new_summary }}
-
-    --- - **监控页面**: [点击访问]({{ url }}) {% if screenshot_url %} - **页面快照**: [点击查看]({{ screenshot_url }}) {% endif %}'
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    \"\"\"\n    格式化OPPO小游戏调试器版本更新通知\n    Args:\n    extracted_data: 提取的数据字典\n    task_info: 任务信息 (name, url, current_time等)\n    Returns:\n    str: 格式化后的通知内容\n    \"\"\"\n    try:\n        major_version = extracted_data.get('major_version', '未知')\n        minor_version = extracted_data.get('minor_version', '未知')\n        download_url = extracted_data.get('download_url', '')\n\n        current_time = task_info.get('current_time', '未知时间')\n\n        notification = f\"\U0001F3AE **OPPO小游戏调试器版本更新**\\n\\n\"\n        notification += f\"⏰ **更新时间**: {current_time}\\n\\n\"\n        notification += f\"\U0001F522 **大版本号**: {major_version}\\n\"\n        notification += f\"\U0001F4F1 **小版本号**: {minor_version}\\n\\n\"\n\n        if download_url:\n            notification += f\"\U0001F4E5 **下载地址**: [点击下载]({download_url})\\n\\n\"\n        else:\n            notification += f\"\U0001F4E5 **下载地址**: 暂无可用链接\\n\\n\"\n\n        notification += f\"\U0001F517 **监控页面**: [OPPO开发者文档]({task_info.get('url', '')})\\n\\n\"\n        notification += \"\U0001F4A1 此通知由版本监控系统自动生成\"\n\n        return notification\n\n    except Exception as e:\n        return f\"\U0001F6AB 格式化通知失败: {str(e)}\\n\\n\U0001F4A1 此通知由版本监控系统自动生成\""
+- name: 华为快应用引擎更新说明
+  url: https://developer.huawei.com/consumer/cn/doc/quickApp-Guides/quickapp-version-updates-0000001079803874
+  frequency: 1m
+  rule: xpath://*[@id="body0000001079803874"]
+  enabled: false
+  screenshot: false
+  notification_title: 华为快应用引擎更新说明
+  notification: null
+  storage_strategy: file
+  ai_analysis_enabled: true
+  ai_description: "监控华为快应用引擎的版本更新说明，重点关注：\n\n1. **版本信息提取**：\n   - 版本号（如：1121）\n   - 更新日期（如：2025-6-6）\n\n2. **更新内容结构化**：\n   - 变更项目名称（如：安装开发工具、华为快应用加载器使用指导）\n   - 具体变更描述\n   - 相关文档链接\n\n3. **格式化要求**：\n   - 去除页面结构标识（如\"指南 变更点 说明\"等导航文本）\n   - 将变更项目名称格式化为加粗标题\n   - 为每个变更项添加清晰的分隔\n   - 保留并美化文档链接，添加图标标识\n   - 确保通知内容简洁易读，适合飞书显示\n\n4. **特殊处理需求**：\n   - 内容包含HTML链接标签，需要转换为Markdown格式\n   - 文本中可能包含特殊字符和空格，需要精确匹配\n   - 复杂的格式化逻辑建议使用Python代码处理，而非Jinja2模板\n\n5. **通知目标**：\n   - 及时通知开发团队华为快应用引擎的版本更新\n   - 突出显示重要的功能变更和工具更新\n   - 提供直接的文档链接便于查看详细信息"
+  ai_extraction_rules:
+    changes_section_html: regex:\d{4}版本更新说明（\d{4}-\d{1,2}-\d{1,2}）([\s\S]*?)(?=\n?\d{4}版本更新说明|$)
+    update_date: regex:\d{4}版本更新说明（(\d{4}-\d{1,2}-\d{1,2})）
+    version_number: regex:(\d{4})版本更新说明（\d{4}-\d{1,2}-\d{1,2}）
+  ai_formatter_code: null

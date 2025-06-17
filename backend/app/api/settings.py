@@ -69,7 +69,4 @@ def update_notification_settings(notification_config: Notification):
         logger.error(f"Failed to save or apply notification settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to save or apply settings.")
 
-@router.get("/notifications/presets", response_model=Dict[str, str])
-def get_notification_presets():
-    """Retrieve all available notification template presets as a dict."""
-    return settings.notification_presets or {} 
+# Notification presets removed - only using AI-generated Python code

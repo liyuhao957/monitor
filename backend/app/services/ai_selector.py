@@ -47,7 +47,7 @@ class AISelector:
             prompt = self._build_prompt(request)
             
             response = self.client.chat.completions.create(
-                model="o3",
+                model="claude-sonnet-4-20250514",
                 messages=[
                     {
                         "role": "system",

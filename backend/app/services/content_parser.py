@@ -95,6 +95,9 @@ class ContentParser:
         
         # 执行正则匹配
         try:
+            logger.info(f"尝试匹配字段 {field_name}，正则: {regex_pattern}")
+            logger.info(f"内容长度: {len(content)}，内容前200字符: {content[:200]}")
+
             match = re.search(regex_pattern, content, re.IGNORECASE | re.DOTALL)
             if match:
                 # 如果有捕获组，返回第一个捕获组
@@ -105,9 +108,11 @@ class ContentParser:
 
                 # 兜底清理：移除明显的HTML标签残留
                 result = self._clean_html_residue(result)
+                logger.info(f"字段 {field_name} 匹配成功: {result}")
                 return result
             else:
-                logger.debug(f"正则表达式 {regex_pattern} 在内容中未找到匹配")
+                logger.warning(f"字段 {field_name} 正则表达式 {regex_pattern} 在内容中未找到匹配")
+                logger.warning(f"内容样本: {content[:500]}...")
                 return None
         except re.error as e:
             logger.error(f"正则表达式错误 {regex_pattern}: {e}")
@@ -159,7 +164,7 @@ class ContentParser:
 
     def _clean_html_residue(self, text: str) -> str:
         """
-        兜底清理：移除明显的HTML标签残留
+        兜底清理：移除明显的HTML标签残留，但保留链接信息
 
         Args:
             text: 待清理的文本
@@ -170,7 +175,10 @@ class ContentParser:
         if not text:
             return text
 
-        # 移除完整的HTML标签
+        # 先将<a>标签转换为Markdown格式
+        text = re.sub(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', r'[\2](\1)', text)
+
+        # 移除其他HTML标签
         text = re.sub(r'<[^>]+>', '', text)
 
         # 移除HTML实体

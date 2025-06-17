@@ -17,10 +17,11 @@ export interface Task {
   screenshot: boolean;
   notification_title?: string;
   notification: any; // You might want to type this more strictly
-  notification_template?: string;
+  // notification_template removed - only using AI-generated Python code
   ai_analysis_enabled: boolean;
   ai_description?: string;
   ai_extraction_rules?: Record<string, string> | null;
+  ai_formatter_code?: string | null;
 }
 
 export interface TelegramNotification {
@@ -52,6 +53,7 @@ export interface AIPreviewResponse {
   content?: string;
   summary?: string;
   extraction_rules?: Record<string, string>;
+  formatter_code?: string;
   error?: string;
 }
 
@@ -107,9 +109,7 @@ export const settingsService = {
   updateNotificationSettings(settings: Notification) {
     return apiClient.put<Notification>('/settings/notifications', settings);
   },
-  getNotificationPresets() {
-    return apiClient.get<Record<string, string>>('/settings/notifications/presets');
-  },
+  // getNotificationPresets removed - only using AI-generated Python code
   getExtractionRules() {
     return apiClient.get<RuleInfo[]>('/settings/rules');
   }
@@ -118,6 +118,9 @@ export const settingsService = {
 export const aiService = {
   previewNotification(request: AIPreviewRequest) {
     return apiClient.post<AIPreviewResponse>('/ai/preview', request);
+  },
+  getSavedTemplate(taskName: string) {
+    return apiClient.post<AIPreviewResponse>('/ai/get-saved-template', { task_name: taskName });
   }
 };
 
