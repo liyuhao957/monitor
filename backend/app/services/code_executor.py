@@ -143,39 +143,8 @@ class SafeCodeExecutor:
             logger.error(error_msg)
             logger.error(f"错误详情: {traceback.format_exc()}")
             
-            # 返回错误信息和原始数据
-            fallback_content = self._generate_fallback_notification(extracted_data, task_info, error_msg)
-            return fallback_content
-    
-    def _generate_fallback_notification(
-        self, 
-        extracted_data: Dict[str, Any], 
-        task_info: Dict[str, Any], 
-        error_msg: str
-    ) -> str:
-        """
-        生成备用通知内容（当代码执行失败时）
-        """
-        content_parts = [
-            f"🚨 **通知格式化失败**",
-            f"",
-            f"**任务名称**: {task_info.get('name', '未知')}",
-            f"**监控地址**: {task_info.get('url', '未知')}",
-            f"**检测时间**: {task_info.get('current_time', '未知')}",
-            f"",
-            f"**错误信息**: {error_msg}",
-            f"",
-            f"**提取的数据**:"
-        ]
-        
-        for key, value in extracted_data.items():
-            # 限制值的长度，避免过长的内容
-            str_value = str(value)
-            if len(str_value) > 200:
-                str_value = str_value[:200] + "..."
-            content_parts.append(f"- **{key}**: {str_value}")
-        
-        return "\n".join(content_parts)
+            # 直接抛出异常，不再生成备用通知
+            raise e
 
 # 全局执行器实例
 _code_executor: Optional[SafeCodeExecutor] = None

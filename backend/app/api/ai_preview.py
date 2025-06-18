@@ -89,12 +89,13 @@ async def preview_ai_notification(request: AIPreviewRequest):
                     logger.info(f"AI代码执行成功，生成预览内容")
                 except Exception as e:
                     logger.warning(f"AI代码执行失败，使用默认预览: {e}")
-                    preview_content = "AI代码预览生成失败，但代码已保存"
+                    # AI代码执行失败，直接在错误中报告，不生成备用内容
+                    raise Exception(f"AI代码执行预览失败: {e}")
 
             return AIPreviewResponse(
                 success=True,
                 title=result.title,
-                content=preview_content or "AI格式化代码已生成，请保存后查看实际效果",
+                content=preview_content, # 如果成功则有内容，失败则无
                 summary=result.summary,
                 extraction_rules=result.extraction_rules,
                 formatter_code=result.formatter_code
@@ -219,12 +220,8 @@ async def get_saved_ai_template(request: GetSavedAITemplateRequest):
             logger.error(f"执行AI模板代码失败: {e}\n详细错误:\n{error_detail}")
             logger.error(f"提取的数据: {extracted_data}")
             return AIPreviewResponse(
-                success=True,
-                title="AI模板已配置",
-                content=f"✅ AI通知模板已配置\n\n监控描述: {task.ai_description}\n\n提取字段: {', '.join(task.ai_extraction_rules.keys()) if task.ai_extraction_rules else '未知'}\n\n注：模板代码执行失败，请重新生成模板。\n\n错误详情: {str(e)}",
-                summary="AI模板配置信息",
-                extraction_rules=task.ai_extraction_rules,
-                formatter_code=task.ai_formatter_code
+                success=False,
+                error=f"模板代码执行失败: {e}"
             )
             
     except Exception as e:

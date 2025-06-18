@@ -131,30 +131,14 @@ const openEditDialog = async (task: Task) => {
       if (response.data.success && response.data.content) {
         customTemplate.value = response.data.content;
       } else {
-        const extractedFields = task.ai_extraction_rules ? Object.keys(task.ai_extraction_rules).join(', ') : '未知';
-        customTemplate.value = `✅ AI通知模板已配置
-
-📝 监控描述: ${task.ai_description || '无描述'}
-
-📊 提取字段: ${extractedFields}
-
-💡 如需基于最新页面内容重新生成：
-1. 点击"📄 获取页面内容"
-2. 点击"🤖 生成AI模板预览"`;
+        // 加载失败，只显示错误信息
+        customTemplate.value = `❌ 加载已保存的AI模板失败: ${response.data.error || '未知错误'}`;
       }
     }).catch(error => {
       console.error('加载AI模板失败:', error);
-      const extractedFields = task.ai_extraction_rules ? Object.keys(task.ai_extraction_rules).join(', ') : '未知';
-      customTemplate.value = `✅ AI通知模板已配置
-
-📝 监控描述: ${task.ai_description || '无描述'}
-
-📊 提取字段: ${extractedFields}
-
-⚠️ 加载模板预览失败，你可以：
-1. 点击"📄 获取页面内容"
-2. 点击"🤖 生成AI模板预览"
-重新生成基于最新内容的模板。`;
+      // 加载失败，只显示错误信息
+      const errorMsg = error.response?.data?.error || '请求失败';
+      customTemplate.value = `❌ 加载已保存的AI模板失败: ${errorMsg}`;
     });
   } else {
     customTemplate.value = '';

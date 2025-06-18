@@ -346,12 +346,16 @@ async def _run_task_internal(task: Task):
                             )
                         except Exception as e:
                             logger.error(f"Error executing AI formatter code for task '{task.name}': {e}")
-                            # 使用简单的错误消息
-                            message = f"❌ AI通知生成失败: {str(e)}\n\n任务: {task.name}\nURL: {task.url}"
+                            # AI代码执行失败，直接抛出异常，中断任务
+                            raise e
                     else:
-                        # 没有AI代码，使用简单的默认消息
-                        logger.warning(f"[{task.name}] No AI formatter code available, using default message")
-                        message = f"📈 网页内容变更告警\n\n任务名称: {task.name}\n监控页面: {task.url}\n检测时间: {template_context.get('current_time', '')}"
+                        # 没有AI代码，不发送任何通知
+                        logger.warning(f"[{task.name}] No AI formatter code available, skipping notification.")
+                        message = "" # 确保消息为空
+
+                    # 如果消息为空则不发送
+                    if not message:
+                        return
 
                     # 防重复通知检查
                     if not _should_send_notification(task.name, new_content):
