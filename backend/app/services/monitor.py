@@ -189,8 +189,27 @@ async def _run_task_internal(task: Task):
 
                 await browser.close()
 
-            logger.info(f"[{task.name}] Extracting content with rule: {task.rule}")
-            new_content = await _extract_content(html_content, task.rule)
+            # 处理多规则或单规则
+            if task.rules and len(task.rules) > 0:
+                # 多规则模式
+                logger.info(f"[{task.name}] Extracting content with {len(task.rules)} rules")
+                
+                all_content = []
+                for i, rule in enumerate(task.rules):
+                    rule_content = await _extract_content(html_content, rule)
+                    if rule_content:
+                        all_content.append(f"=== 规则 {i+1}: {rule} ===\n{rule_content}")
+                        logger.info(f"[{task.name}] Rule {i+1} extracted {len(rule_content)} characters")
+                    else:
+                        logger.warning(f"[{task.name}] Rule {i+1} extracted no content: {rule}")
+                        all_content.append(f"=== 规则 {i+1}: {rule} ===\n[无内容]")
+                
+                new_content = "\n\n".join(all_content)
+                logger.info(f"[{task.name}] Combined content from {len(task.rules)} rules: {len(new_content)} characters")
+            else:
+                # 单规则模式（向后兼容）
+                logger.info(f"[{task.name}] Extracting content with rule: {task.rule}")
+                new_content = await _extract_content(html_content, task.rule)
 
             # Enhanced storage state checking
             old_content = storage.get_last_result(task.name)

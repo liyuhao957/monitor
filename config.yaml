@@ -20,7 +20,8 @@ tasks:
   url: https://developer.huawei.com/consumer/cn/doc/Tools-Library/quickapp-ide-download-0000001101172926
   frequency: 1m
   rule: xpath://*[@id="ZH-CN_TOPIC_0000001101172926__li16222518142"]
-  enabled: true
+  rules: null
+  enabled: false
   screenshot: false
   notification_title: 华为
   notification: null
@@ -36,7 +37,8 @@ tasks:
   url: https://developer.honor.com/cn/doc/guides/101380
   frequency: 1m
   rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
-  enabled: true
+  rules: null
+  enabled: false
   screenshot: false
   notification_title: 荣耀
   notification: null
@@ -55,7 +57,8 @@ tasks:
   url: https://ie-activity-cn.heytapimage.com/static/minigame/CN/docs/index.html#/download/index
   frequency: 1m
   rule: xpath://*[@id="main"]/ul[1]
-  enabled: true
+  rules: null
+  enabled: false
   screenshot: false
   notification_title: OPPO快游戏
   notification: null
@@ -64,13 +67,16 @@ tasks:
   ai_description: 我只想监控OPPO小游戏调试器的最新版本更新。V9.8.0这样的是小版本号，1155这样的是大版本号，当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个适用飞书的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址、检测时间。通知格式要求：包含emoji、简洁美观。
   ai_extraction_rules:
     major_version: css:ul li:first-child code
-    full_version_text: css:ul li:first-child a
-    download_url: css:ul li:first-child a::attr(href)
-  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n\n    try:\n        # 获取基础数据\n        major_version = extracted_data.get('major_version', '未知')\n        full_version_text = extracted_data.get('full_version_text', '')\n        download_url = extracted_data.get('download_url', '')\n\n        # 从完整版本文本中提取小版本号\n        minor_version = '未知'\n        if full_version_text:\n            # 使用正则表达式提取 V 后面的版本号\n            version_match = re.search(r'V(\\d+\\.\\d+\\.\\d+)', full_version_text)\n            if version_match:\n                minor_version = f\"V{version_match.group(1)}\"\n\n        # 获取当前时间\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 构建通知内容\n        notification = f\"\"\"\U0001F3AE **OPPO小游戏调试器版本更新**\n\n\U0001F4E6 **版本信息**\n• **大版本号**: `{major_version}`\n• **小版本号**: `{minor_version}`\n\n\U0001F517 **下载地址**\n[点击下载最新版本]({download_url})\n\n⏰ **检测时间**: {current_time}\n\n\U0001F4A1 监控任务: {task_info.get('name', 'OPPO')}\"\"\"\n\n        return notification\n\n    except Exception as e:\n        # 异常处理,返回基础通知\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n        return f\"\"\"\U0001F3AE **OPPO小游戏调试器更新检测**\n\n⚠️ 数据提取异常,请检查页面结构变化\n\n⏰ **检测时间**: {current_time}\n\U0001F4A1 **监控任务**: {task_info.get('name', 'OPPO')}\"\"\""
+    minor_version: regex:OPPO 小游戏调试器 (V[\d.]+)
+    download_url: css:ul li:first-child a
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        major_version = extracted_data.get('major_version', '未知')\n        minor_version = extracted_data.get('minor_version', '未知')\n        download_url = extracted_data.get('download_url', '未提供')\n        detection_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        notification = (\n            f\"\U0001F3AE **OPPO小游戏调试器版本更新通知**\\n\\n\" +\n            f\"\U0001F4CB **版本信息**\\n\" +\n            f\"• **大版本号**: {major_version}\\n\" +\n            f\"• **小版本号**: {minor_version}\\n\" +\n            f\"• **下载地址**: [点击下载]({download_url})\\n\" +\n            f\"• **检测时间**: {detection_time}\\n\\n\" +\n            f\"\U0001F514 **提醒**: 请及时更新到最新版本以获得最佳开发体验！\"\n        )\n\n        return notification\n    except Exception as e:\n        return f\"❌ 通知生成失败: {str(e)}\""
 - name: 华为快应用引擎更新说明
   url: https://developer.huawei.com/consumer/cn/doc/quickApp-Guides/quickapp-version-updates-0000001079803874
   frequency: 1m
-  rule: xpath://*[@id="body0000001079803874"]
+  rule: css:#body0000001079803874 > div:nth-child(1)
+  rules:
+  - css:#body0000001079803874 > div:nth-child(1)
+  - css:#body0000001079803874 > div:nth-child(2)
   enabled: true
   screenshot: false
   notification_title: 华为快应用引擎更新说明
@@ -94,4 +100,4 @@ tasks:
     version_title: css:div[id="body0000001079803874"] h2:first-of-type
     update_contents: css:div[id="body0000001079803874"] h2:first-of-type ~ div table tbody tr td:nth-child(2)
     doc_links: css:div[id="body0000001079803874"] h2:first-of-type ~ div table tbody tr td:nth-child(2) a::attr(href)
-  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n\n    try:\n        # 获取基础数据\n        version_title = extracted_data.get('version_title', '未知版本')\n        update_contents = extracted_data.get('update_contents', [])\n        doc_links = extracted_data.get('doc_links', [])\n\n        # 提取版本号\n        version_number = '未知'\n        if version_title:\n            version_match = re.search(r'(\\d+)版本更新说明', version_title)\n            if version_match:\n                version_number = version_match.group(1)\n\n        # 提取发布时间\n        publish_date = '未知时间'\n        if version_title:\n            date_match = re.search(r'(([^)]+))', version_title)\n            if date_match:\n                publish_date = date_match.group(1)\n\n        # 处理更新内容\n        formatted_contents = []\n        if update_contents:\n            for i, content in enumerate(update_contents[:10]):  # 限制显示条数\n                if content and content.strip():\n                    # 清理内容,移除多余空白\n                    clean_content = re.sub(r'\\s+', ' ', content.strip())\n                    # 截断过长内容\n                    if len(clean_content) > 200:\n                        clean_content = clean_content[:200] + '...'\n                    formatted_contents.append(f\"• {clean_content}\")\n\n        if not formatted_contents:\n            formatted_contents = ['• 暂无详细更新内容']\n\n        # 处理文档链接\n        unique_links = []\n        if doc_links:\n            seen_links = set()\n            for link in doc_links:\n                if link and link.strip() and link not in seen_links:\n                    seen_links.add(link)\n                    # 确保链接完整\n                    if not link.startswith('http'):\n                        link = 'https://developer.huawei.com' + link if link.startswith('/') else link\n                    unique_links.append(link)\n\n        # 获取检测时间\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 构建通知内容\n        notification = f\"\"\"\U0001F680 **华为快应用引擎版本更新通知**\n\n\U0001F4CB **版本信息**\n• **版本号**: {version_number}\n• **发布时间**: {publish_date}\n• **检测时间**: {current_time}\n\n\U0001F4DD **更新内容**\n{chr(10).join(formatted_contents)}\n\n\U0001F517 **相关文档链接**\"\"\"\n\n        if unique_links:\n            for i, link in enumerate(unique_links[:5], 1):  # 最多显示5个链接\n                notification += f\"\\n{i}. {link}\"\n        else:\n            notification += \"\\n• 暂无相关文档链接\"\n\n        notification += f\"\"\"\n\n\U0001F4A1 监控任务: {task_info.get('name', '华为快应用引擎更新说明')}\n⏰ 检测时间: {current_time}\"\"\"\n\n        return notification\n\n    except Exception as e:\n        # 异常处理,返回基础通知\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n        return f\"\"\"\U0001F680 **华为快应用引擎版本更新通知**\n\n⚠️ **数据解析异常**\n检测到华为快应用引擎可能有更新,但数据解析出现问题.\n\n\n\U0001F4A1 监控任务: {task_info.get('name', '华为快应用引擎更新说明')}\n⏰ 检测时间: {current_time}\n\n请手动检查更新内容.\"\"\""
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n\n        # 获取原始分段内容\n        page_content = extracted_data.get('page_content', '')\n\n        # 解析分段1:提取版本号和日期\n        version_match = re.search(r'(\\d{4})版本更新说明', page_content)\n        version = version_match.group(1) if version_match else '未知版本'\n\n        date_match = re.search(r'((\\d{4}-\\d{1,2}-\\d{1,2}))', page_content)\n        update_date = date_match.group(1) if date_match else '未知日期'\n\n        # 解析分段2:提取表格内容\n        changes = []\n        doc_links = []\n\n        # 查找表格内容\n        table_match = re.search(r'=== 提取规则 2:.*?===(.*)', page_content, re.DOTALL)\n        if table_match:\n            table_content = table_match.group(1)\n            soup = BeautifulSoup(table_content, 'html.parser')\n\n            # 提取表格行\n            rows = soup.find_all('tr')\n            for row in rows[1:]:  # 跳过表头\n                cells = row.find_all('td')\n                if len(cells) >= 2:\n                    change_point = cells[0].get_text(strip=True)\n                    description_cell = cells[1]\n\n                    # 提取说明内容\n                    description_parts = []\n                    for li in description_cell.find_all('li'):\n                        description_parts.append(li.get_text(strip=True))\n\n                    # 提取链接\n                    links = description_cell.find_all('a')\n                    for link in links:\n                        link_text = link.get_text(strip=True)\n                        link_url = link.get('href', '')\n                        if link_url:\n                            doc_links.append(f\"[{link_text}]({link_url})\")\n\n                    if description_parts:\n                        changes.append({\n                            'point': change_point,\n                            'description': ' '.join(description_parts)\n                        })\n\n        detection_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 构建通知内容\n        notification = (\n            f\"\U0001F680 **华为快应用引擎版本更新通知**\\n\\n\" +\n            f\"\U0001F4CB **版本信息**\\n\" +\n            f\"• **版本号**: {version}\\n\" +\n            f\"• **更新日期**: {update_date}\\n\" +\n            f\"• **检测时间**: {detection_time}\\n\\n\"\n        )\n\n        if changes:\n            notification += f\"\U0001F4DD **更新内容**\\n\"\n            for i, change in enumerate(changes, 1):\n                notification += f\"{i}. **{change['point']}**\\n\"\n                notification += f\"   {change['description']}\\n\\n\"\n\n        if doc_links:\n            notification += f\"\U0001F4DA **相关文档**\\n\"\n            for link in doc_links:\n                notification += f\"• {link}\\n\"\n            notification += \"\\n\"\n\n        notification += f\"---\\n\U0001F4A1 *监控任务*: {task_info.get('name', '华为快应用引擎更新说明')}\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 通知生成失败: {str(e)}\""

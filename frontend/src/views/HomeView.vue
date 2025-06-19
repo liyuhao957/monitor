@@ -16,8 +16,42 @@ const rules = ref<RuleInfo[]>([]);
 const selectedRuleId = ref('css');
 const ruleValue = ref('');
 
+// 多规则支持
+const multiRulesEnabled = ref(false);
+const rulesList = ref<Array<{id: number, ruleType: string, value: string}>>([]);
+
 // Jinja2 template presets removed - only using AI-generated Python code
 const customTemplate = ref('');
+
+// 多规则管理函数
+let nextRuleId = 1;
+
+const addRule = () => {
+  rulesList.value.push({
+    id: nextRuleId++,
+    ruleType: 'css',
+    value: ''
+  });
+};
+
+const removeRule = (id: number) => {
+  const index = rulesList.value.findIndex(rule => rule.id === id);
+  if (index > -1) {
+    rulesList.value.splice(index, 1);
+  }
+};
+
+const toggleMultiRules = () => {
+  if (multiRulesEnabled.value) {
+    // 切换到多规则模式，初始化一个规则
+    if (rulesList.value.length === 0) {
+      addRule();
+    }
+  } else {
+    // 切换回单规则模式
+    rulesList.value = [];
+  }
+};
 
 // AI预览相关状态
 const isGeneratingAI = ref(false);
@@ -79,6 +113,10 @@ const openCreateDialog = () => {
   selectedRuleId.value = 'css';
   ruleValue.value = '';
 
+  // 重置多规则状态
+  multiRulesEnabled.value = false;
+  rulesList.value = [];
+
   // Set initial state for create - only AI-generated templates
   customTemplate.value = '';
 
@@ -103,21 +141,45 @@ const openEditDialog = async (task: Task) => {
   };
 
   // --- Rule parsing logic ---
-  const ruleParts = (task.rule || 'css:').split(':');
-  const ruleType = ruleParts[0];
-  const currentRule = rules.value.find(r => r.id === ruleType);
-
-  if (currentRule) {
-    selectedRuleId.value = currentRule.id;
-    if (currentRule.needs_value) {
-      ruleValue.value = ruleParts.slice(1).join(':');
-    } else {
-      ruleValue.value = '';
-    }
-  } else {
-    // Fallback for unknown rule
+  if (task.rules && task.rules.length > 0) {
+    // 多规则模式
+    multiRulesEnabled.value = true;
+    rulesList.value = task.rules.map((ruleStr, index) => {
+      const ruleParts = ruleStr.split(':');
+      const ruleType = ruleParts[0];
+      const ruleValue = ruleParts.slice(1).join(':');
+      return {
+        id: index + 1,
+        ruleType: ruleType,
+        value: ruleValue
+      };
+    });
+    nextRuleId = rulesList.value.length + 1;
+    
+    // 为向后兼容，也设置单规则字段
     selectedRuleId.value = 'css';
-    ruleValue.value = task.rule || '';
+    ruleValue.value = '';
+  } else {
+    // 单规则模式（向后兼容）
+    multiRulesEnabled.value = false;
+    rulesList.value = [];
+    
+    const ruleParts = (task.rule || 'css:').split(':');
+    const ruleType = ruleParts[0];
+    const currentRule = rules.value.find(r => r.id === ruleType);
+
+    if (currentRule) {
+      selectedRuleId.value = currentRule.id;
+      if (currentRule.needs_value) {
+        ruleValue.value = ruleParts.slice(1).join(':');
+      } else {
+        ruleValue.value = '';
+      }
+    } else {
+      // Fallback for unknown rule
+      selectedRuleId.value = 'css';
+      ruleValue.value = task.rule || '';
+    }
   }
   // --- End of rule parsing ---
 
@@ -161,15 +223,32 @@ const handleSubmit = async () => {
   }
   
   // --- Rule composition logic ---
-  const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
-  if (selectedRule) {
-    if (selectedRule.needs_value) {
-      form.value.rule = `${selectedRule.id}:${ruleValue.value}`;
-    } else {
-      form.value.rule = selectedRule.id;
-    }
+  if (multiRulesEnabled.value && rulesList.value.length > 0) {
+    // 多规则模式
+    form.value.rules = rulesList.value.map(rule => {
+      const selectedRule = rules.value.find(r => r.id === rule.ruleType);
+      if (selectedRule && selectedRule.needs_value) {
+        return `${rule.ruleType}:${rule.value}`;
+      } else {
+        return rule.ruleType;
+      }
+    });
+    // 保持向后兼容，设置第一个规则为主规则
+    form.value.rule = form.value.rules[0];
   } else {
-    form.value.rule = ruleValue.value; // Fallback
+    // 单规则模式
+    const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
+    if (selectedRule) {
+      if (selectedRule.needs_value) {
+        form.value.rule = `${selectedRule.id}:${ruleValue.value}`;
+      } else {
+        form.value.rule = selectedRule.id;
+      }
+    } else {
+      form.value.rule = ruleValue.value; // Fallback
+    }
+    // 清空多规则字段
+    form.value.rules = undefined;
   }
   // --- End of rule composition ---
   
@@ -239,34 +318,60 @@ const fetchPageContent = async () => {
   }
 
   // 构建提取规则
-  const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
-  let rule = '';
-  if (selectedRule) {
-    if (selectedRule.needs_value) {
-      rule = `${selectedRule.id}:${ruleValue.value}`;
-    } else {
-      rule = selectedRule.id;
+  let requestData: ContentFetchRequest;
+  
+  if (multiRulesEnabled.value && rulesList.value.length > 0) {
+    // 多规则模式
+    const rulesArray = rulesList.value.map(rule => {
+      const selectedRule = rules.value.find(r => r.id === rule.ruleType);
+      if (selectedRule && selectedRule.needs_value) {
+        return `${rule.ruleType}:${rule.value}`;
+      } else {
+        return rule.ruleType;
+      }
+    });
+    
+    if (rulesArray.length === 0) {
+      ElMessage.error('请至少添加一个提取规则');
+      return;
     }
+    
+    requestData = {
+      name: form.value.name,
+      url: form.value.url,
+      rules: rulesArray
+    };
   } else {
-    rule = ruleValue.value;
-  }
+    // 单规则模式
+    const selectedRule = rules.value.find(r => r.id === selectedRuleId.value);
+    let rule = '';
+    if (selectedRule) {
+      if (selectedRule.needs_value) {
+        rule = `${selectedRule.id}:${ruleValue.value}`;
+      } else {
+        rule = selectedRule.id;
+      }
+    } else {
+      rule = ruleValue.value;
+    }
 
-  if (!rule) {
-    ElMessage.error('请先设置提取规则');
-    return;
+    if (!rule) {
+      ElMessage.error('请先设置提取规则');
+      return;
+    }
+    
+    requestData = {
+      name: form.value.name,
+      url: form.value.url,
+      rule: rule
+    };
   }
 
   isFetchingContent.value = true;
   contentFetchError.value = '';
 
   try {
-    const request: ContentFetchRequest = {
-      name: form.value.name,
-      url: form.value.url,
-      rule: rule
-    };
-
-    const response = await contentService.fetchContent(request);
+    const response = await contentService.fetchContent(requestData);
 
     if (response.data.success && response.data.content) {
       fetchedContent.value = response.data.content;
@@ -346,6 +451,11 @@ watch(selectedRuleId, (newId) => {
   }
 });
 
+// Watch for multi-rules toggle
+watch(multiRulesEnabled, (enabled) => {
+  toggleMultiRules();
+});
+
 onMounted(() => {
   fetchTasks();
   fetchRules();
@@ -363,7 +473,22 @@ onMounted(() => {
         <el-table-column prop="name" label="任务名称" width="180" />
         <el-table-column prop="url" label="URL" />
         <el-table-column prop="frequency" label="频率" width="80" />
-        <el-table-column prop="rule" label="提取规则" />
+        <el-table-column label="提取规则">
+          <template #default="{ row }">
+            <div v-if="row.rules && row.rules.length > 0">
+              <el-tag type="warning" size="small">多规则 ({{ row.rules.length }})</el-tag>
+              <div style="font-size: 12px; color: #909399; margin-top: 2px;">
+                {{ row.rules[0] }}{{ row.rules.length > 1 ? '...' : '' }}
+              </div>
+            </div>
+            <div v-else>
+              <el-tag type="info" size="small">单规则</el-tag>
+              <div style="font-size: 12px; color: #909399; margin-top: 2px;">
+                {{ row.rule }}
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <div>
@@ -392,23 +517,112 @@ onMounted(() => {
             <el-input v-model="form.frequency" placeholder="例如: 10m, 1h" />
           </el-form-item>
           <el-form-item label="提取规则">
-            <el-input v-model="ruleValue" placeholder="请输入规则值" :disabled="!rules.find(r => r.id === selectedRuleId)?.needs_value">
-              <template #prepend>
-                <el-select v-model="selectedRuleId" style="width: 130px">
-                  <el-option
-                    v-for="rule in rules"
-                    :key="rule.id"
-                    :label="rule.name"
-                    :value="rule.id"
-                  />
-                </el-select>
-              </template>
-            </el-input>
-            <div class="rule-description">
-              <p v-if="rules.find(r => r.id === selectedRuleId)">
-                {{ rules.find(r => r.id === selectedRuleId)?.description }}<br>
-                <em>{{ rules.find(r => r.id === selectedRuleId)?.example }}</em>
-              </p>
+            <!-- 多规则开关 -->
+            <div style="margin-bottom: 10px;">
+              <el-switch 
+                v-model="multiRulesEnabled" 
+                active-text="多规则模式" 
+                inactive-text="单规则模式"
+                style="margin-right: 10px;"
+              />
+              <el-tooltip placement="top">
+                <template #content>
+                  <div>
+                    多规则模式允许您提取页面的多个不同区域，<br />
+                    AI将综合分析所有提取内容生成通知。<br />
+                    例如：华为页面的标题区域和内容区域。
+                  </div>
+                </template>
+                <el-icon><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+
+            <!-- 单规则模式 -->
+            <div v-if="!multiRulesEnabled">
+              <el-input v-model="ruleValue" placeholder="请输入规则值" :disabled="!rules.find(r => r.id === selectedRuleId)?.needs_value">
+                <template #prepend>
+                  <el-select v-model="selectedRuleId" style="width: 130px">
+                    <el-option
+                      v-for="rule in rules"
+                      :key="rule.id"
+                      :label="rule.name"
+                      :value="rule.id"
+                    />
+                  </el-select>
+                </template>
+              </el-input>
+              <div class="rule-description">
+                <p v-if="rules.find(r => r.id === selectedRuleId)">
+                  {{ rules.find(r => r.id === selectedRuleId)?.description }}<br>
+                  <em>{{ rules.find(r => r.id === selectedRuleId)?.example }}</em>
+                </p>
+              </div>
+            </div>
+
+            <!-- 多规则模式 -->
+            <div v-if="multiRulesEnabled">
+              <div v-for="(rule, index) in rulesList" :key="rule.id" class="multi-rule-item">
+                <div class="rule-row">
+                  <el-input 
+                    v-model="rule.value" 
+                    :placeholder="`提取规则 ${index + 1}`" 
+                    :disabled="!rules.find(r => r.id === rule.ruleType)?.needs_value"
+                    style="flex: 1;"
+                  >
+                    <template #prepend>
+                      <el-select v-model="rule.ruleType" style="width: 130px">
+                        <el-option
+                          v-for="ruleOption in rules"
+                          :key="ruleOption.id"
+                          :label="ruleOption.name"
+                          :value="ruleOption.id"
+                        />
+                      </el-select>
+                    </template>
+                  </el-input>
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    @click="removeRule(rule.id)"
+                    :disabled="rulesList.length <= 1"
+                    style="margin-left: 8px;"
+                  >
+                    删除
+                  </el-button>
+                </div>
+                <div class="rule-description" v-if="rules.find(r => r.id === rule.ruleType)">
+                  <p>
+                    {{ rules.find(r => r.id === rule.ruleType)?.description }}<br>
+                    <em>{{ rules.find(r => r.id === rule.ruleType)?.example }}</em>
+                  </p>
+                </div>
+              </div>
+              
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="addRule"
+                style="margin-top: 10px;"
+              >
+                + 添加规则
+              </el-button>
+              
+              <div class="multi-rule-help">
+                <el-alert
+                  title="多规则使用提示"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                  style="margin-top: 10px;"
+                >
+                  <ul>
+                    <li>每个规则提取页面的不同区域</li>
+                    <li>AI将合并所有区域的内容进行分析</li>
+                    <li>适用于复杂页面的精确数据提取</li>
+                    <li>例如：标题区域 + 内容区域 + 链接区域</li>
+                  </ul>
+                </el-alert>
+              </div>
             </div>
           </el-form-item>
           <el-form-item label="通知标题 (可选)">
@@ -654,5 +868,33 @@ onMounted(() => {
   background-color: #fef0f0;
   border-radius: 4px;
   border: 1px solid #fbc4c4;
+}
+
+/* 多规则样式 */
+.multi-rule-item {
+  margin-bottom: 15px;
+  padding: 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background-color: #fafafa;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-rule-help {
+  margin-top: 15px;
+}
+
+.multi-rule-help .el-alert ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.multi-rule-help .el-alert li {
+  margin: 4px 0;
 }
 </style>

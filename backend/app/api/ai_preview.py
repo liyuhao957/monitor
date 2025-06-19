@@ -58,22 +58,28 @@ async def preview_ai_notification(request: AIPreviewRequest):
 
             # 尝试执行AI生成的代码来生成预览内容
             preview_content = None
-            if result.formatter_code and result.extraction_rules:
+            if result.formatter_code:
                 try:
                     from app.services.code_executor import execute_notification_formatter
                     from app.services.content_parser import get_content_parser
 
-                    # 使用AI生成的提取规则提取数据
-                    content_parser = get_content_parser()
                     extracted_data = {}
-                    for field, rule in result.extraction_rules.items():
-                        # 使用 ContentParser 的 _extract_single_field 方法
-                        value = content_parser._extract_single_field(field, rule, "", page_content)
-                        if value is not None:
-                            extracted_data[field] = value
-                            logger.info(f"成功提取字段 {field}: {value[:100]}...")
-                        else:
-                            logger.warning(f"字段 {field} 提取失败，规则: {rule}")
+
+                    # 如果有提取规则，使用规则提取数据（单规则HTML内容）
+                    if result.extraction_rules:
+                        content_parser = get_content_parser()
+                        for field, rule in result.extraction_rules.items():
+                            # 使用 ContentParser 的 _extract_single_field 方法
+                            value = content_parser._extract_single_field(field, rule, "", page_content)
+                            if value is not None:
+                                extracted_data[field] = value
+                                logger.info(f"成功提取字段 {field}: {value[:100]}...")
+                            else:
+                                logger.warning(f"字段 {field} 提取失败，规则: {rule}")
+                    else:
+                        # 没有提取规则，直接传递原始页面内容（多规则分段内容）
+                        extracted_data['page_content'] = page_content
+                        logger.info(f"多规则分段内容，直接传递页面内容，长度: {len(page_content)}")
 
                     logger.info(f"数据提取完成，共提取 {len(extracted_data)} 个字段: {list(extracted_data.keys())}")
 

@@ -40,7 +40,8 @@ class Task(BaseModel):
     name: str
     url: HttpUrl
     frequency: str
-    rule: str
+    rule: str  # 保持向后兼容
+    rules: Optional[List[str]] = None  # 新增多规则支持
     enabled: bool = True
     screenshot: bool = False
     notification_title: Optional[str] = None

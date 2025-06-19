@@ -12,7 +12,8 @@ export interface Task {
   name: string;
   url: string;
   frequency: string;
-  rule: string;
+  rule: string;  // 保持向后兼容，单规则任务
+  rules?: string[];  // 新增多规则支持
   enabled: boolean;
   screenshot: boolean;
   notification_title?: string;
@@ -68,7 +69,8 @@ export interface RuleInfo {
 export interface ContentFetchRequest {
   name: string;
   url: string;
-  rule: string;
+  rule?: string;  // 单规则（向后兼容）
+  rules?: string[];  // 多规则支持
 }
 
 export interface ContentFetchResponse {
