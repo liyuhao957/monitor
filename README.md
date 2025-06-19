@@ -109,7 +109,7 @@ npm run dev
 - `name`: (必须) 任务唯一名称。
 - `url`: (必须) 要监控的网页 URL。
 - `frequency`: (必须) 监控频率，格式为 `数字`+`单位` (s, m, h, d)。例如 `10m`, `1h`。
-- `rule`: 提取规则，格式为 `css:selector`, `xpath:expression` 或 `regex:pattern`。
+- `rule`: 提取规则，格式为 `css:selector` 或 `xpath:expression`。
 - `enabled`: (可选) 是否启用任务，默认为 `true`。
 - `screenshot`: (可选) 是否在每次检测时截图，默认为 `false`。
 - `notification`: (可选) 独立的通知配置，会覆盖全局配置。

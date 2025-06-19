@@ -36,13 +36,6 @@ def get_extraction_rules():
             needs_value=True
         ),
         RuleInfo(
-            id="regex",
-            name="Regex",
-            description="通过正则表达式从原始 HTML 源码中提取内容。灵活但容易因页面结构改变而失效。",
-            example='例如: "price":\\s*(\\d+\\.\\d{2})',
-            needs_value=True
-        ),
-        RuleInfo(
             id="full_text",
             name="Full Text",
             description="提取整个页面去除 HTML 标签后的所有文本。当您关心任何文本变化时使用。",
