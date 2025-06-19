@@ -69,6 +69,8 @@ class SafeCodeExecutor:
                 'KeyError': KeyError,
                 'IndexError': IndexError,
                 'AttributeError': AttributeError,
+                # 添加必要的内置函数用于datetime操作
+                '__import__': __import__,
             }
         }
         
@@ -76,7 +78,7 @@ class SafeCodeExecutor:
         self.safe_modules = {
             're': __import__('re'),
             'json': __import__('json'),
-            'datetime': __import__('datetime'),
+            'datetime': __import__('datetime').datetime,  # 直接导入 datetime 类，支持 datetime.now() 语法
             'html': __import__('html'),
             'urllib': __import__('urllib'),
         }

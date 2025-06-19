@@ -18,26 +18,39 @@ default_notification:
 tasks:
 - name: 华为快应用加载器监控
   url: https://developer.huawei.com/consumer/cn/doc/Tools-Library/quickapp-ide-download-0000001101172926
-  frequency: 10m
+  frequency: 1m
   rule: xpath://*[@id="ZH-CN_TOPIC_0000001101172926__li16222518142"]
-  enabled: false
+  enabled: true
   screenshot: false
   notification_title: 华为
   notification: null
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我想监控华为快应用加载器的最新版本更新,当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个合适的飞书通知，包含：版本号（V15.1.1.301类似这样）、规范版本（类似1121）、发现时间、下载地址。通知格式要求：包含emoji、简洁美观，结尾带上💡 此通知由版本监控系统自动生成
+  ai_description: 我想监控华为快应用加载器的最新版本更新,当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个合适的飞书通知，包含：版本号（V15.1.1.301类似这样）、规范版本（类似1121）、发现时间、下载地址。通知格式要求：包含emoji、简洁美观。
+  ai_extraction_rules:
+    version: css:li a::text
+    spec_version: xpath://li//text()[contains(.,'支持')][contains(.,'规范')]
+    download_url: css:li a::attr(href)
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        version = extracted_data.get('version', '未知版本')\n        spec_version = extracted_data.get('spec_version', '未知规范')\n        download_url = extracted_data.get('download_url', '')\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 构建通知内容\n        notification = f\"\"\"\U0001F680 **华为快应用加载器更新通知**\n\n\U0001F4F1 **最新版本**: {version}\n\U0001F4CB **规范版本**: {spec_version}\n⏰ **发现时间**: {current_time}\n\U0001F4E5 **下载地址**: [点击下载]({download_url})\n\n\U0001F4A1 *监控任务*: {task_info.get('name', '华为快应用加载器监控')}\"\"\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 通知生成失败: {str(e)}\""
 - name: 荣耀调试器
   url: https://developer.honor.com/cn/doc/guides/101380
-  frequency: 10m
+  frequency: 1m
   rule: xpath://*[@id="doc-content-text"]/div[2]/table/tbody/tr[2]
-  enabled: false
+  enabled: true
   screenshot: false
   notification_title: 荣耀
   notification: null
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个适用于飞书的通知格式，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能。通知格式要求：包含emoji、简洁美观、版本功能需要排版、结尾带上💡 此通知由版本监控系统自动生成。
+  ai_description: 我只想监控荣耀加载器的最新版本更新。当最新版本号发生变化时（如从V15.1.1.301变为V15.2.1.305），请生成一个适用于飞书的通知格式，包含：荣耀快应用引擎版本号、荣耀引擎版本号、快应用联盟平台版本号、下载地址、调试器版本号、版本功能、检测时间。通知格式要求：包含emoji、简洁美观、版本功能需要排版
+  ai_extraction_rules:
+    honor_engine_version: css:td:nth-child(1) div
+    honor_core_version: css:td:nth-child(2) div div
+    quickapp_platform_version: css:td:nth-child(3) p span
+    download_url: css:td:nth-child(4) a::attr(href)
+    debugger_version: css:td:nth-child(5) div div div span
+    version_features: css:td:nth-child(6) p
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        honor_engine_version = extracted_data.get('honor_engine_version', '未知')\n        honor_core_version = extracted_data.get('honor_core_version', '未知')\n        quickapp_platform_version = extracted_data.get('quickapp_platform_version', '未知')\n        download_url = extracted_data.get('download_url', '')\n        debugger_version = extracted_data.get('debugger_version', '未知')\n        version_features = extracted_data.get('version_features', '暂无说明')\n\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 格式化版本功能,添加适当的换行和缩进\n        formatted_features = version_features.replace('；', '\\n• ').replace(';', '\\n• ')\n        if not formatted_features.startswith('• '):\n            formatted_features = '• ' + formatted_features\n\n        notification = f\"\"\"\U0001F680 **荣耀调试器版本更新通知**\n\n\U0001F4F1 **版本信息**\n• 荣耀快应用引擎版本:`{honor_engine_version}`\n• 荣耀引擎版本:`{honor_core_version}`\n• 快应用联盟平台版本:`{quickapp_platform_version}`\n• 调试器版本:`{debugger_version}`\n\n\U0001F4E5 **下载地址**\n[点击下载最新版本]({download_url})\n\n✨ **版本功能**\n{formatted_features}\n\n\U0001F550 **检测时间**:{current_time}\n\n\U0001F4A1 *荣耀调试器监控 - 自动检测版本更新*\"\"\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 生成通知失败:{str(e)}\""
 - name: OPPO
   url: https://ie-activity-cn.heytapimage.com/static/minigame/CN/docs/index.html#/download/index
   frequency: 1m
@@ -48,20 +61,26 @@ tasks:
   notification: null
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我只想监控OPPO小游戏调试器的最新版本更新。V9.8.0这样的是小版本号，1155这样的是大版本号，当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个适用飞书的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址。通知格式要求：包含emoji、简洁美观、结尾带上💡 此通知由版本监控系统自动生成。
+  ai_description: 我只想监控OPPO小游戏调试器的最新版本更新。V9.8.0这样的是小版本号，1155这样的是大版本号，当最新版本号发生变化时（如从OPPO 小游戏调试器 V9.8.0变为OPPO 小游戏调试器 V9.0.0 和 1155变为1166），请生成一个适用飞书的通知，包含：OPPO引擎大版本号、OPPO引擎小版本号、下载地址、检测时间。通知格式要求：包含emoji、简洁美观。
   ai_extraction_rules:
     major_version: css:li:first-child code
     minor_version: css:li:first-child a::text
     download_url: css:li:first-child a::attr(href)
-  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        major_version = extracted_data.get('major_version', '未知')\n        minor_version = extracted_data.get('minor_version', '未知')\n        download_url = extracted_data.get('download_url', '')\n\n        # 构建通知内容\n        notification = f\"\"\"\U0001F3AE **OPPO小游戏调试器版本更新**\n\n\U0001F4E6 **版本信息**\n• 大版本号:`{major_version}`\n• 小版本号:`{minor_version}`\n\n\U0001F517 **下载地址**\n[点击下载最新版本]({download_url})\n\n\U0001F4A1 此通知由版本监控系统自动生成\"\"\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 通知生成失败:{str(e)}\\n\\n\U0001F4A1 此通知由版本监控系统自动生成\""
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        major_version = extracted_data.get('major_version', '未知')\n        minor_version = extracted_data.get('minor_version', '未知')\n        download_url = extracted_data.get('download_url', '')\n\n        # 获取当前时间\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 构建通知内容\n        notification = f\"\"\"\U0001F3AE **OPPO小游戏调试器版本更新**\n\n\U0001F4E6 **版本信息**\n• 大版本号:`{major_version}`\n• 小版本号:`{minor_version}`\n\n\U0001F517 **下载地址**\n[点击下载最新版本]({download_url})\n\n⏰ **检测时间**\n{current_time}\n\n\U0001F4A1 版本监控任务:{task_info.get('name', 'OPPO')}\"\"\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 通知生成失败:{str(e)}\""
 - name: 华为快应用引擎更新说明
   url: https://developer.huawei.com/consumer/cn/doc/quickApp-Guides/quickapp-version-updates-0000001079803874
   frequency: 1m
   rule: xpath://*[@id="body0000001079803874"]
-  enabled: false
+  enabled: true
   screenshot: false
   notification_title: 华为快应用引擎更新说明
   notification: null
   storage_strategy: file
   ai_analysis_enabled: true
-  ai_description: 我想监控华为快应用引擎的版本更新说明，当最新版本号发生变化时（如从1121版本变为1122版本），请生成一个合适的飞书通知，包含：版本号（如1121）、更新日期（如2025-6-6）、更新内容、文档链接。通知格式要求：包含emoji、更新内容需要排版换行美观（更新内容从"说明"往后到下一个版本号之间都是更新内容）、简洁美观，结尾带上💡 此通知由版本监控系统自动生成
+  ai_description: 我想监控华为快应用引擎的版本更新说明，当最新版本号发生变化时（如从1121版本变为1122版本），请生成一个合适的飞书通知，包含：版本号（如1121）、更新内容、文档链接、检测时间。通知格式要求：包含emoji、更新内容需要排版换行美观（更新内容从"说明"往后（不包括说明俩字）到下一个版本号（不包括下一个版本号）之间都是更新内容）、简洁美观，
+  ai_extraction_rules:
+    version: css:h2:first-child
+    update_date: css:h2:first-child
+    update_content: css:h2:first-child + div table tbody
+    doc_link: css:h2:first-child + div table tbody a::attr(href)
+  ai_formatter_code: "def format_notification(extracted_data: dict, task_info: dict) -> str:\n    try:\n        version = extracted_data.get('version', '未知版本')\n        update_date = extracted_data.get('update_date', '未知日期')\n        update_content = extracted_data.get('update_content', '暂无更新内容')\n        doc_link = extracted_data.get('doc_link', '')\n        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n\n        # 格式化更新内容,确保换行美观\n        formatted_content = update_content.replace('\\n\\n', '\\n').strip()\n        if formatted_content and not formatted_content.startswith('- '):\n            # 将内容按句号或换行分割,添加列表格式\n            lines = []\n            for line in formatted_content.split('\\n'):\n                line = line.strip()\n                if line:\n                    if not line.startswith('- '):\n                        lines.append(f\"- {line}\")\n                    else:\n                        lines.append(line)\n            formatted_content = '\\n'.join(lines)\n\n        notification = f\"\"\"\U0001F680 **华为快应用引擎版本更新通知**\n\n\U0001F4CB **版本信息**\n\n\U0001F4DD **更新内容**\n{formatted_content}\n\n\U0001F517 **相关链接**\n{doc_link if doc_link else '暂无相关链接'}\n\n⏰ **检测时间**:{current_time}\n\n\U0001F4A1 *华为快应用引擎版本监控 - 及时获取最新更新信息*\"\"\"\n\n        return notification\n\n    except Exception as e:\n        return f\"❌ 生成华为快应用引擎更新通知时发生错误:{str(e)}\""

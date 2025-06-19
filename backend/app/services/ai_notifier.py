@@ -214,6 +214,7 @@ class AINotifier:
 - 生成飞书Markdown格式的通知内容
 - 不使用import语句，不使用Markdown代码块标记
 - **重要**：只写一个函数定义，不要重复函数名或函数定义行
+- **日期时间**：使用 `datetime.now()` 语法（不是 `datetime.datetime.now()`），系统已导入 datetime 类
 
 **硬编码检测：**
 确保代码中没有写死任何具体数值、链接或文本，所有数据都从extracted_data动态获取。

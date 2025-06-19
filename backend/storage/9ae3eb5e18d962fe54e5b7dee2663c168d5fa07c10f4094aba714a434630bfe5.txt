@@ -1,0 +1,27 @@
+<tr>
+   <td style="width: 136.0px;line-height: 2;">
+    <div class="ace-line ace-line old-record-id-doxlr8lxhiQcIMKdrVMG3nDlXqD">
+     10.0.2.200
+    </div></td>
+   <td style="width: 88.0px;line-height: 2;">
+    <div>
+     <div class="ace-line ace-line old-record-id-doxlrRsovOxvZOO8KOPlXsuXFzg">
+      6102
+     </div>
+    </div></td>
+   <td style="width: 98.0px;">
+    <p><span style="color: rgb(0,0,0);">1123</span></p></td>
+   <td style="width: 117.0px;line-height: 2;">
+    <p><span style="color: rgb(37,111,255);"><a href="https://contentplatform-drcn.hihonorcdn.com/developerPlatform/Debugger_v80.0.2.200/Debugger_v80.0.2.200_phoneDebugger_release_20250612_090344.apk" rel="noopener" style="color: rgb(37,111,255);" target="_blank">点击下载</a></span></p></td>
+   <td style="width: 121.0px;line-height: 2;">
+    <div>
+     <div class="ace-line ace-line old-record-id-doxlrtbcGIMPpgHrgmboohwbFXd">
+      <div>
+       <span style="color: rgb(0,0,0);">80.0.2.200</span>
+      </div>
+     </div>
+    </div></td>
+   <td style="width: 592.0px;" width="153">
+    <p style="text-align: left;">优化：adbutton组件用户体验优化</p></td>
+  </tr>
+  
