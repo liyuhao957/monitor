@@ -92,259 +92,142 @@ class AINotifier:
             logger.error(f"AI通知分析失败: {error_msg}")
             raise Exception(f"AI通知分析失败: {error_msg}")
 
-
-
     def _get_system_prompt(self) -> str:
-        """获取系统提示词"""
-        return """你是一个专业的通知格式化代码生成器。你需要分析网页内容，理解数据结构，然后生成Python代码来格式化通知内容。
+        """获取平衡版HTML分析提示词"""
+        return """你是专业的HTML数据提取专家，分析HTML结构并生成精确的提取规则和格式化代码。
 
-**工作原则：结构化分析 → 精确映射 → 独立提取 → 代码生成**
+**核心任务：**
+1. **HTML结构分析**：理解DOM层次关系，识别数据组织模式（table、list、div嵌套等）
+2. **精确元素定位**：为每个字段生成独立的CSS选择器或XPath表达式
+3. **Python代码生成**：使用BeautifulSoup提取数据并格式化为飞书Markdown通知
+4. **代码安全保证**：只使用标准库和BeautifulSoup4，禁止文件操作和网络请求
 
-**核心要求：**
-1. 必须按照4个阶段顺序完成工作，不允许跳跃
-2. 每个字段必须有独立的提取逻辑，绝不重复使用相同正则表达式
-3. 深度理解HTML结构后再设计提取规则
-4. 生成通用、安全、健壮的Python代码
-5. 使用简洁的Markdown格式，适配飞书机器人显示
+**HTML提取策略：**
+- **优先CSS选择器**：语法简洁，适合结构化数据提取
+  - 位置选择：`tr:first-child td:nth-child(2)`, `li:last-child`
+  - 属性选择：`a[href*='.apk']`, `td[class='version']`
+  - 文本提取：`div.content::text`, `span::text`
+  - 属性提取：`a::attr(href)`, `img::attr(src)`
+- **XPath补充**：处理复杂位置关系和条件查询
+  - 文本内容：`//td[contains(text(),'版本')]/following-sibling::td[1]/text()`
+  - 属性值：`//a[contains(@href,'.apk')]/@href`
 
-**代码安全性约束：**
-- 只能使用标准库：re, json, datetime, html, urllib.parse
-- 只能使用安全的第三方库：BeautifulSoup4 (from bs4 import BeautifulSoup)
-- 禁止使用：os, subprocess, eval, exec, open, file操作
-- 禁止网络请求：requests, urllib.request
-- 禁止导入任意模块：__import__, importlib
+**重要：提取规则必须明确指定意图**
+- **默认提取文本**：`css:a` 或 `css:a::text` → 提取元素的文本内容
+- **提取链接地址**：`css:a::attr(href)` → 提取href属性值  
+- **提取图片地址**：`css:img::attr(src)` → 提取src属性值
+- **其他属性提取**：`css:element::attr(属性名)` → 提取指定属性
 
-**代码结构标准化：**
-你必须生成标准格式的函数，注意：
-1. 不要使用Markdown代码块标记（```python 或 ```）
-2. 直接输出纯Python代码
-3. 函数必须完整且可执行
-4. **重要**：必须使用英文标点符号（, . ; : ! ? ( ) " '），不要使用中文标点符号（，。；：！？（）""''）
-5. **禁止使用多行字符串**：不要使用 f'''...''' 或 '''...'''，只使用简单的字符串拼接
-6. **使用字符串拼接**：用 + 连接多个字符串，或使用 f"单行字符串"
+**特别注意<a>标签**：
+- 如果需要版本号、名称等文本信息：使用 `css:a` 或 `css:a::text`
+- 如果需要下载链接、跳转地址：使用 `css:a::attr(href)`
+- 不再有默认的特殊处理，必须明确表达提取意图！
 
-标准格式（注意文档字符串必须用三引号包围）：
-def format_notification(extracted_data: dict, task_info: dict) -> str:
-    \"\"\"
-    格式化通知内容
-    Args:
-        extracted_data: 提取的数据字典
-        task_info: 任务信息 (name, url, current_time等)
-    Returns:
-        str: 格式化后的通知内容
-    \"\"\"
-    try:
-        # ✅ 正确：使用动态数据
-        field1 = extracted_data.get('field1', '未知')
-        field2 = extracted_data.get('field2', '未知')
+**关键原则：**
+- **每个字段独立选择器**：绝不重复使用相同的选择器
+- **精确定位目标**：避免匹配多个元素，使用nth-child()等精确定位
+- **通用性设计**：选择器应适应页面结构的合理变化
+- **错误处理完整**：包含数据缺失、解析失败等情况的处理
 
-        # ❌ 错误：绝对禁止硬编码具体值
-        # field1 = "1155"  # 这样会导致固定值问题！
-        # field2 = "V9.8.0"  # 这样会导致固定值问题！
-        # download_url = "https://example.com/file.zip"  # 这样会导致固定值问题！
+**严禁硬编码（关键）：**
+❌ 错误示例：`version = "V15.1.1.301"`, `url = "https://固定链接"`  
+✅ 正确方式：`version = extracted_data.get('version', '未知')`
+✅ 动态获取：`download_url = extracted_data.get('download_url', '')`
 
-        return f"动态内容: {field1}, {field2}"
-    except Exception as e:
-        return f"格式化失败: {str(e)}"
-
-**必须严格遵循的4个工作阶段：**
-
-**阶段1：HTML结构深度分析**
-- 逐层分析HTML的标签结构和层次关系
-- 识别数据的组织模式（列表、表格、嵌套等）
-- 理解目标数据在HTML中的确切位置和上下文
-- 分析数据的格式特征（版本号、链接、文本等）
-
-**阶段2：字段定位与映射**
-- 明确每个用户需求字段对应的HTML元素
-- 区分需要提取的是文本内容、属性值还是链接
-- 建立字段与HTML位置的精确一对一映射关系
-- 确保每个字段有独立的定位逻辑
-
-**阶段3：提取策略设计**
-- 为每个字段单独设计正则表达式，绝不重复使用
-- 明确每个捕获组的具体作用和选择逻辑
-- 确保不同字段从HTML的不同部分或用不同方式提取
-- 设计时考虑数据的变化模式和稳定性
-- **精确匹配原则**：
-  - 当页面有多个相似格式的数据时（如多个版本号），要精确定位目标数据
-  - 使用更具体的上下文模式，不要使用过于宽泛的正则表达式
-  - 如果需要匹配"最后一个"某种模式，考虑使用负向预查或更精确的定位方式
-  - **关键示例**：
-    * 错误：`\d+\.\d+\.\d+\.\d+\s+(.+)$` - 会匹配第一个版本号后的所有内容
-    * 正确：`</a>\s+\d+\.\d+\.\d+\.\d+\s+(.+)$` - 使用</a>标签定位最后一个版本号
-    * 或者：`(\d+\.\d+\.\d+\.\d+)\s+([^<\d]+)$` - 确保只匹配非数字和非标签的内容
-  - **多版本号处理规则**：
-    * 如果有多个版本号，必须使用唯一的上下文标记区分
-    * 使用HTML标签（如</a>）、特定文本、位置关系等作为锚点
-    * 验证正则表达式只匹配目标内容，不包含其他版本号或无关数据
-
-**阶段4：代码生成与验证**
-- 生成完整的Python格式化函数
-- 包含完整的错误处理逻辑
-- 验证代码的安全性和健壮性
-- 确保输出格式符合飞书Markdown要求
-
-**通用性指导：**
-- 识别数据的组织模式（表格、列表、嵌套结构）
-- 理解HTML标签的语义和层次关系
-- 设计通用的解析策略，而不是硬编码特定内容
-- 考虑数据变化的可能性，编写健壮的代码
-
-**输出质量保证：**
-生成的通知内容必须：
-- 使用Markdown格式，适配飞书显示
-- 结构清晰，包含标题、时间、主要内容
-- 链接转换为 [文本](URL) 格式
-- 使用适当的emoji增强可读性
-- 内容简洁，突出重点信息
-
-**错误处理和健壮性：**
-代码必须包含完整的错误处理：
-- 数据为空的情况
-- HTML解析失败的情况
-- 正则匹配失败的情况
-- 返回有意义的错误信息
-- **重要**：即使部分数据缺失，也要生成包含可用数据的通知，不要直接返回"未获取到页面内容"
-
-**输出格式要求：**
-你必须按照以下格式输出，展示你的分阶段分析过程和最终结果：
+**代码结构要求（严格）：**
+- **函数名必须为：format_notification**
+- **函数签名必须为：def format_notification(extracted_data: dict, task_info: dict) -> str:**
+- 不使用import语句（模块已预导入）
+- 不使用Markdown代码块标记
+- 必须使用英文标点符号
+- 使用try-except处理异常
+- 返回飞书Markdown格式内容
+- **关键**：只生成一个函数定义，绝不重复函数定义行
 
 ---ANALYSIS---
-**阶段1：HTML结构分析**
-[详细分析HTML结构，识别数据组织方式]
-
-**阶段2：字段映射**
-[明确每个字段对应的HTML位置]
-
-**阶段3：提取策略**
-[为每个字段设计独立的提取方案]
-
-**阶段4：代码生成**
-[说明生成的Python代码的设计思路]
+简要分析HTML结构和数据位置
 
 ---TITLE---
-[通知标题，可包含emoji]
+通知标题
 
 ---CODE---
-[完整的Python格式化函数代码，注意：不要包含任何Markdown标记，直接输出纯Python代码]
+完整的Python函数代码（直接输出，无Markdown标记）
 
 ---SUMMARY---
-[代码功能说明和使用方法]
+简要说明
 
 ---FIELDS---
-[字段名=描述，每行一个]
+字段名=描述
 
 ---RULES---
-[字段名=regex:正则表达式，每行一个，确保每个字段使用不同的正则]
-
-**严格要求：**
-- 必须展示完整的4阶段分析过程
-- 每个字段必须有独立的正则表达式
-- Python代码必须安全、通用、健壮
-- 分隔符必须准确无误"""
+字段名=css:选择器 或 字段名=xpath:表达式"""
 
     def _build_structure_analysis_prompt(self, task: Task, content: str) -> str:
-        """构建内容结构分析提示词（用于预览）"""
-        # 对于预览，我们需要完整的内容来生成准确的提取规则
-        # 但为了避免超时，限制在15000字符以内
-        content_summary = (content[:15000] + '...') if len(content) > 15000 else content
+        """构建平衡版HTML分析提示词"""
+        content_summary = (content[:12000] + '...') if len(content) > 12000 else content
 
-        return """请严格按照4个阶段分析以下内容，生成数据提取规则和Python格式化代码：
+        return """分析HTML内容并生成数据提取规则：
 
 **任务信息：**
-- 任务名称：{task_name}
-- 监控URL：{task_url}
-- 用户监控需求：{task_description}
+- 名称：{task_name}
+- 需求：{task_description}
 
-**页面HTML内容：**
+**HTML内容：**
 {content}
 
-**你必须严格按照以下4个阶段完成工作：**
+**分析要求：**
 
-**阶段1：HTML结构深度分析**
-请仔细分析上述HTML内容：
-- 识别HTML的标签结构和层次关系
-- 理解数据是如何组织的（列表、表格、嵌套结构等）
-- 找出用户需要的每个数据字段在HTML中的确切位置
-- 分析数据的格式特征和变化模式
+**1. HTML结构分析**
+- 识别数据组织方式（table、ul/li、div嵌套等）
+- 理解每个目标数据在DOM中的位置关系
+- 找出数据字段的HTML容器和层次结构
+- 分析是否存在多个相似元素需要精确定位
 
-**阶段2：字段定位与映射**
-根据用户需求，明确定义需要提取的字段：
-- 列出用户需要的所有数据字段
-- 为每个字段找到对应的HTML元素位置
-- 确定每个字段需要提取的是文本内容、属性值还是链接
-- 建立字段与HTML位置的精确映射关系
+**2. 字段定位策略**
+- 为每个需要的字段确定具体的HTML元素
+- 分析字段是文本内容、链接href、还是其他属性
+- 设计独立的选择器，避免重复使用
+- 考虑页面结构变化的稳定性
 
-**阶段3：提取策略设计**
-为每个字段设计独立的正则表达式：
-- 每个字段必须有完全不同的正则表达式，绝不允许重复使用
-- 明确每个正则表达式中捕获组的作用
-- 确保正则表达式能准确提取目标内容
-- 考虑数据的稳定性和变化模式
-- **精确匹配要求**：
-  - 分析HTML中是否有多个相似格式的数据（如多个版本号、多个链接等）
-  - 使用具体的上下文标记来精确定位目标数据
-  - 避免使用过于宽泛的模式，如 `(.+)$` 可能会匹配太多内容
-  - 利用HTML标签、特定文本标记等作为定位锚点
-  - 示例：要匹配特定位置的版本号，使用其前后的独特标记来定位
+**3. 选择器生成原则**
+- **优先CSS选择器**：简洁直观，例如：
+  - `table tr:first-child td:nth-child(1)` - 表格第一行第一列
+  - `td a[href*='.apk']` - 包含.apk链接的单元格
+  - `li:last-child span.version` - 最后一个列表项的版本
+- **XPath作为补充**：复杂定位，例如：
+  - `//td[contains(text(),'版本')]/following-sibling::td[1]` - 包含"版本"文本后的相邻单元格
+- **属性提取语法**：
+  - CSS: `a[href]::attr(href)`, `span::text`
+  - XPath: `//a/@href`, `//span/text()`
 
-**阶段4：Python代码生成**
-生成完整的Python格式化函数：
-- 分析提取的数据结构和用户格式化需求
-- 设计通用的数据处理逻辑（HTML解析、文本清理、链接转换等）
-- 生成符合安全约束的Python代码
-- 包含完整的错误处理和边界情况处理
-- 确保输出格式适配飞书Markdown显示
+**特别注意<a>标签的处理**：
+- 默认行为已改变：`css:a` 现在提取文本内容，而不是href
+- 提取版本号等文本：`css:li:first-child a` 或 `css:li:first-child a::text`
+- 提取下载链接：必须明确使用 `css:li:first-child a::attr(href)`
+- 千万不要混淆！根据字段含义选择正确的提取方式
 
-**代码生成要求：**
-1. **安全性**：只使用允许的标准库和BeautifulSoup4
-2. **通用性**：代码应该能处理类似结构的页面变化
-3. **健壮性**：包含完整的错误处理和数据验证
-4. **可读性**：代码结构清晰，注释完整
-5. **输出质量**：生成的通知内容格式美观，信息完整
-6. **重要**：不要使用任何import语句！所有需要的模块（re, json, datetime, html, BeautifulSoup等）都已经预先导入，可以直接使用
-7. **可用函数**：可以使用常用内置函数如 len, str, int, float, bool, list, dict, all, any, max, min, sum, sorted, enumerate, zip, map, filter 等
-8. **关键要求**：**绝对不要硬编码任何具体的数据值**！必须使用 extracted_data.get() 方法获取动态数据
-9. **动态数据使用**：所有版本号、链接、文本内容都必须从 extracted_data 参数中获取，不要写死任何当前看到的具体值
+**4. 代码生成要求**
+- 使用BeautifulSoup解析HTML
+- 为每个字段编写独立的提取逻辑
+- **关键**：使用`extracted_data.get('字段名', '默认值')`获取动态数据
+- 包含完整的错误处理（数据为空、解析失败等）
+- 生成飞书Markdown格式的通知内容
+- 不使用import语句，不使用Markdown代码块标记
+- **重要**：只写一个函数定义，不要重复函数名或函数定义行
 
-**验证与测试：**
-- **必须**用你生成的每个正则表达式在提供的HTML内容中进行实际测试
-- 说明每个正则表达式能提取到的具体内容片段（显示前100个字符）
-- 如果提取结果为空或不符合预期，**必须**重新分析HTML结构并修正正则表达式
-- 确保提取的内容完整且格式正确
-- 验证生成的Python代码能正确处理提取的数据
-- **特别注意**：
-  - 如果提取到的内容包含了不应该包含的部分（如版本功能字段包含了其他版本号），说明正则表达式不够精确
-  - 检查是否有多个匹配项，确保提取的是正确的那一个
-  - 对于"最后一个"、"特定位置"的数据，要验证提取的确实是目标数据
-- **版本功能字段特别验证**：
-  - 如果页面有多个版本号，版本功能应该只包含功能描述文本
-  - 不应该包含版本号、下载链接、HTML标签等其他内容
-  - 示例：正确的版本功能 - "优化：性能提升50%"
-  - 示例：错误的版本功能 - "6102 1123 点击下载 80.0.2.200 优化：性能提升50%"
+**硬编码检测：**
+确保代码中没有写死任何具体数值、链接或文本，所有数据都从extracted_data动态获取。
 
-**最终任务：**
-根据以上4个阶段的分析，生成：
-1. 每个字段独立且准确的正则提取规则
-2. 完整的Python格式化函数代码
-3. 适配飞书显示的Markdown格式输出
+**验证步骤：**
+- 确认每个选择器在HTML中能准确定位到目标元素
+- 验证提取的内容格式正确，无HTML标签残留
+- 检查选择器的唯一性，避免匹配多个元素
 
-**关键提醒：**
-- 必须展示完整的4阶段分析过程
-- 每个字段必须使用完全不同的正则表达式
-- Python代码必须安全、通用、健壮
-- 代码必须能处理HTML解析、文本清理、链接转换等复杂格式化需求
-- 输出内容必须简洁美观，适合飞书机器人显示
-
-请严格按照要求的输出格式完成工作。""".format(
+请按照标准输出格式（ANALYSIS、TITLE、CODE、SUMMARY、FIELDS、RULES）完成分析。""".format(
             task_name=task.name,
-            task_url=task.url,
             task_description=task.ai_description or "监控网页内容变化",
             content=content_summary
         )
-
-
 
     def _parse_analysis_result(self, response: str) -> NotificationAnalysis:
         """解析AI分析结果（新的分段文本格式）"""
@@ -494,22 +377,32 @@ def format_notification(extracted_data: dict, task_info: dict) -> str:
         if not extraction_rules:
             return
 
-        # 检查是否有重复的正则表达式
-        regex_patterns = []
+        # 检查是否有重复的选择器
+        selectors = []
+        css_count = 0
+        xpath_count = 0
+        
         for field_name, rule in extraction_rules.items():
-            # 提取正则表达式部分
-            if ":" in rule:
-                regex_part = rule.split(":", 1)[1].strip()
+            # 提取选择器部分
+            if rule.startswith('css:'):
+                selector_part = rule[4:].strip()
+                css_count += 1
+            elif rule.startswith('xpath:'):
+                selector_part = rule[6:].strip()
+                xpath_count += 1
+            elif ":" in rule:
+                selector_part = rule.split(":", 1)[1].strip()
             else:
-                regex_part = rule.strip()
+                selector_part = rule.strip()
 
-            if regex_part in regex_patterns:
-                logger.warning(f"检测到重复的正则表达式: {regex_part}")
-                logger.warning(f"字段 {field_name} 使用了与其他字段相同的正则表达式")
+            if selector_part in selectors:
+                logger.warning(f"检测到重复的选择器: {selector_part}")
+                logger.warning(f"字段 {field_name} 使用了与其他字段相同的选择器")
             else:
-                regex_patterns.append(regex_part)
+                selectors.append(selector_part)
 
-        logger.info(f"提取规则验证完成，共 {len(extraction_rules)} 个字段，{len(set(regex_patterns))} 个独立正则表达式")
+        logger.info(f"提取规则验证完成，共 {len(extraction_rules)} 个字段，{len(set(selectors))} 个独立选择器")
+        logger.info(f"选择器类型分布: CSS选择器 {css_count} 个，XPath表达式 {xpath_count} 个")
 
     def _clean_python_code(self, code: str) -> str:
         """清理AI生成的Python代码，移除Markdown标记等"""
@@ -558,26 +451,16 @@ def format_notification(extracted_data: dict, task_info: dict) -> str:
             cleaned_lines.append(original_line)
             logger.debug(f"第{i+1}行: 保留代码行: {stripped[:50]}...")
 
-        # 重新组合代码
+        # 重新组合代码（简化处理）
         cleaned_code = '\n'.join(cleaned_lines)
 
-        # 修复多行字符串问题 - 将 f""" 替换为字符串拼接
-        cleaned_code = self._fix_multiline_strings(cleaned_code)
-
-        # 替换中文标点符号为英文标点符号（这是关键修复）
+        # 只做基本的标点符号清理
         chinese_punctuation = {
-            '，': ',',  # 中文逗号 -> 英文逗号
+            '，': ',',  # 中文逗号 -> 英文逗号  
             '。': '.',  # 中文句号 -> 英文句号
-            '；': ';',  # 中文分号 -> 英文分号
             '：': ':',  # 中文冒号 -> 英文冒号
-            '！': '!',  # 中文感叹号 -> 英文感叹号
-            '？': '?',  # 中文问号 -> 英文问号
             '（': '(',  # 中文左括号 -> 英文左括号
             '）': ')',  # 中文右括号 -> 英文右括号
-            '"': '"',  # 中文左双引号 -> 英文双引号
-            '"': '"',  # 中文右双引号 -> 英文双引号
-            ''': "'",  # 中文左单引号 -> 英文单引号
-            ''': "'",  # 中文右单引号 -> 英文单引号
         }
 
         for chinese, english in chinese_punctuation.items():
@@ -585,41 +468,6 @@ def format_notification(extracted_data: dict, task_info: dict) -> str:
 
         # 移除开头和结尾的多余空行
         cleaned_code = cleaned_code.strip()
-
-        # 修复文档字符串格式
-        cleaned_code = self._fix_docstring_format(cleaned_code)
-
-        # 确保代码以函数定义开始，并移除重复的函数定义行
-        if cleaned_code:
-            lines = cleaned_code.split('\n')
-
-            # 查找第一个函数定义
-            start_index = -1
-            for i, line in enumerate(lines):
-                if line.strip().startswith('def '):
-                    start_index = i
-                    break
-
-            if start_index >= 0:
-                # 从第一个函数定义开始
-                if start_index > 0:
-                    lines = lines[start_index:]
-                    logger.debug(f"从第{start_index+1}行开始提取函数定义")
-
-                # 移除重复的函数定义行
-                cleaned_lines = []
-                seen_function_def = False
-                for line in lines:
-                    if line.strip().startswith('def format_notification'):
-                        if not seen_function_def:
-                            cleaned_lines.append(line)
-                            seen_function_def = True
-                        else:
-                            logger.debug(f"跳过重复的函数定义行: {line.strip()}")
-                    else:
-                        cleaned_lines.append(line)
-
-                cleaned_code = '\n'.join(cleaned_lines)
 
         logger.info(f"代码清理完成，原长度: {len(code)}, 清理后长度: {len(cleaned_code)}")
         logger.debug(f"清理后的代码前500字符:\n{cleaned_code[:500]}")
@@ -770,84 +618,78 @@ def format_notification(extracted_data: dict, task_info: dict) -> str:
         return result
 
     def _validate_python_code(self, code: str):
-        """验证Python代码的安全性"""
-        import ast
+        """验证Python代码的安全性和格式正确性"""
+        if not code or not code.strip():
+            raise ValueError("代码不能为空")
 
-        # 危险的模块和函数
-        dangerous_imports = [
-            'os', 'subprocess', 'sys', 'eval', 'exec', 'open', 'file',
-            'requests', 'urllib.request', '__import__', 'importlib',
-            'pickle', 'marshal', 'shelve', 'dbm'
-        ]
+        # 检查代码长度
+        if len(code) < 50:
+            raise ValueError("代码过短，可能不完整")
 
-        # 允许的安全模块
-        safe_imports = [
-            're', 'json', 'datetime', 'html', 'urllib.parse', 'bs4', 'BeautifulSoup'
-        ]
+        if len(code) > 10000:
+            raise ValueError("代码过长，可能存在安全风险")
 
-        try:
-            logger.debug(f"开始验证Python代码，长度: {len(code)} 字符")
-
-            # 解析代码为AST
-            tree = ast.parse(code)
-            logger.debug("AST解析成功")
-
-            # 检查导入语句
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name in dangerous_imports:
-                            raise ValueError(f"禁止导入危险模块: {alias.name}")
-                        if alias.name not in safe_imports and not alias.name.startswith('bs4'):
-                            logger.warning(f"检测到未知模块导入: {alias.name}")
-
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module in dangerous_imports:
-                        raise ValueError(f"禁止从危险模块导入: {node.module}")
-                    if node.module not in safe_imports and not (node.module and node.module.startswith('bs4')):
-                        logger.warning(f"检测到未知模块导入: {node.module}")
-
-                # 检查函数调用
-                elif isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        if node.func.id in ['eval', 'exec', 'open', '__import__']:
-                            raise ValueError(f"禁止调用危险函数: {node.func.id}")
-
-            # 检查是否包含必需的函数定义
-            has_format_function = False
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == 'format_notification':
-                    has_format_function = True
+        # 严格检查函数名
+        if 'def format_notification(' not in code:
+            # 检查是否使用了错误的函数名
+            wrong_function_patterns = [
+                'def extract_',
+                'def parse_',
+                'def get_',
+                'def fetch_',
+                'def process_',
+                'def generate_'
+            ]
+            
+            found_wrong_function = None
+            for pattern in wrong_function_patterns:
+                if pattern in code:
+                    # 提取具体的错误函数名
+                    import re
+                    match = re.search(r'def (\w+)\(', code)
+                    if match:
+                        found_wrong_function = match.group(1)
                     break
+            
+            if found_wrong_function:
+                raise ValueError(f"错误的函数名: {found_wrong_function}。必须使用函数名: format_notification")
+            else:
+                raise ValueError("代码中必须包含函数定义: def format_notification(extracted_data: dict, task_info: dict) -> str")
 
-            if not has_format_function:
-                raise ValueError("代码必须包含 format_notification 函数定义")
+        # 检查函数签名是否正确
+        expected_signature = "def format_notification(extracted_data: dict, task_info: dict) -> str:"
+        if expected_signature not in code.replace(' ', '').replace('\n', '').replace('\t', ''):
+            logger.warning("函数签名格式可能不标准，但包含必要的函数名")
 
-            # 检测硬编码值
-            self._detect_hardcoded_values(code)
+        # 检查硬编码问题
+        self._detect_hardcoded_values(code)
 
+        # 检查危险操作
+        dangerous_patterns = [
+            'import os', 'import sys', 'import subprocess', 'import socket',
+            'open(', 'file(', 'exec(', 'eval(', '__import__',
+            'compile(', 'globals()', 'locals()', 'vars(',
+            'setattr(', 'delattr(', 'hasattr(',
+            'input(', 'raw_input(',
+        ]
+
+        dangerous_found = []
+        for pattern in dangerous_patterns:
+            if pattern in code:
+                dangerous_found.append(pattern)
+
+        if dangerous_found:
+            raise ValueError(f"代码包含危险操作: {', '.join(dangerous_found)}")
+
+        # 尝试编译代码检查语法
+        try:
+            compile(code, '<ai_generated_code>', 'exec')
             logger.info("Python代码安全验证通过")
-
         except SyntaxError as e:
-            logger.error(f"Python代码语法错误详情:")
-            logger.error(f"  错误信息: {str(e)}")
-            logger.error(f"  错误位置: 第{e.lineno}行, 第{e.offset}列")
-            logger.error(f"  错误文本: {e.text}")
-
-            # 显示出错行的上下文
-            lines = code.split('\n')
-            if e.lineno and 1 <= e.lineno <= len(lines):
-                start = max(0, e.lineno - 3)
-                end = min(len(lines), e.lineno + 2)
-                logger.error("代码上下文:")
-                for i in range(start, end):
-                    marker = " >>> " if i == e.lineno - 1 else "     "
-                    logger.error(f"{marker}{i+1:3d}: {lines[i]}")
-
-            raise ValueError(f"Python代码语法错误: 第{e.lineno}行 - {str(e)}")
+            raise ValueError(f"代码语法错误: {str(e)}")
         except Exception as e:
-            logger.error(f"Python代码验证异常: {str(e)}")
-            raise ValueError(f"Python代码验证失败: {str(e)}")
+            raise ValueError(f"代码验证失败: {str(e)}")
+
     def _detect_hardcoded_values(self, code: str):
         """检测代码中的硬编码值"""
         try:
@@ -898,11 +740,6 @@ def format_notification(extracted_data: dict, task_info: dict) -> str:
 
         except Exception as e:
             logger.warning(f"硬编码检测失败: {e}")
-
-
-
-
-
 
 # 全局AI通知分析器实例
 _ai_notifier: Optional[AINotifier] = None

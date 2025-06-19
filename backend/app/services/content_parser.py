@@ -1,17 +1,19 @@
 """
-智能内容解析器
-根据AI定义的提取规则，从HTML内容中提取结构化数据
+HTML智能内容解析器
+根据AI定义的CSS/XPath提取规则，从HTML内容中提取结构化数据
 """
-import re
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+from bs4 import BeautifulSoup
+from lxml import html as lxml_html
+
 from app.services.ai_notifier import NotificationAnalysis
 
 logger = logging.getLogger(__name__)
 
-class ContentParser:
-    """智能内容解析器"""
+class HTMLContentParser:
+    """HTML智能内容解析器"""
     
     def __init__(self):
         pass
@@ -23,12 +25,12 @@ class ContentParser:
         new_content: str
     ) -> Dict[str, Any]:
         """
-        根据AI分析结果提取结构化字段
+        根据AI分析结果从HTML内容中提取结构化字段
         
         Args:
             analysis: AI分析结果，包含提取规则
-            old_content: 变化前的内容
-            new_content: 变化后的内容
+            old_content: 变化前的HTML内容
+            new_content: 变化后的HTML内容
             
         Returns:
             提取的结构化数据字典
@@ -39,7 +41,7 @@ class ContentParser:
             logger.info("没有定义提取规则，跳过字段提取")
             return extracted_data
         
-        logger.info(f"开始提取字段，规则数量: {len(analysis.extraction_rules)}")
+        logger.info(f"开始从HTML内容提取字段，规则数量: {len(analysis.extraction_rules)}")
         
         for field_name, rule in analysis.extraction_rules.items():
             try:
@@ -49,10 +51,12 @@ class ContentParser:
                     logger.debug(f"成功提取字段 {field_name}: {value}")
                 else:
                     logger.warning(f"字段 {field_name} 提取失败，规则: {rule}")
+                    extracted_data[field_name] = None
             except Exception as e:
                 logger.error(f"提取字段 {field_name} 时出错: {e}，规则: {rule}")
+                extracted_data[field_name] = None
                 
-        logger.info(f"字段提取完成，成功提取 {len(extracted_data)} 个字段")
+        logger.info(f"字段提取完成，成功提取 {len([v for v in extracted_data.values() if v is not None])} 个字段")
         return extracted_data
     
     def _extract_single_field(
@@ -63,79 +67,133 @@ class ContentParser:
         new_content: str
     ) -> Optional[str]:
         """
-        提取单个字段的值
+        从HTML内容中提取单个字段的值
         
         Args:
             field_name: 字段名
-            rule: 提取规则
-            old_content: 变化前的内容
-            new_content: 变化后的内容
+            rule: 提取规则 (css: 或 xpath: 格式)
+            old_content: 变化前的HTML内容
+            new_content: 变化后的HTML内容
             
         Returns:
             提取的值，如果提取失败返回None
         """
-        # 处理特殊规则
+        # 处理特殊规则：当前时间
         if "datetime.now()" in rule:
             return self._extract_current_time(rule)
         
         # 确定要从哪个内容中提取
-        if "old_summary" in rule or "old_content" in rule:
+        if "old_" in field_name.lower():
             content = old_content
-        elif "new_summary" in rule or "new_content" in rule:
-            content = new_content
         else:
             # 默认从新内容中提取
             content = new_content
         
-        # 提取正则表达式
-        regex_pattern = self._extract_regex_from_rule(rule)
-        if not regex_pattern:
-            logger.warning(f"无法从规则中提取正则表达式: {rule}")
+        if not content:
+            logger.warning(f"字段 {field_name} 对应的内容为空")
             return None
         
-        # 执行正则匹配
-        try:
-            logger.info(f"尝试匹配字段 {field_name}，正则: {regex_pattern}")
-            logger.info(f"内容长度: {len(content)}，内容前200字符: {content[:200]}")
-
-            match = re.search(regex_pattern, content, re.IGNORECASE | re.DOTALL)
-            if match:
-                # 如果有捕获组，返回第一个捕获组
-                if match.groups():
-                    result = match.group(1)
-                else:
-                    result = match.group(0)
-
-                # 兜底清理：移除明显的HTML标签残留
-                result = self._clean_html_residue(result)
-                logger.info(f"字段 {field_name} 匹配成功: {result}")
-                return result
-            else:
-                logger.warning(f"字段 {field_name} 正则表达式 {regex_pattern} 在内容中未找到匹配")
-                logger.warning(f"内容样本: {content[:500]}...")
-                return None
-        except re.error as e:
-            logger.error(f"正则表达式错误 {regex_pattern}: {e}")
+        # 根据规则类型进行提取
+        if rule.startswith('css:'):
+            return self._extract_with_css(field_name, rule[4:].strip(), content)
+        elif rule.startswith('xpath:'):
+            return self._extract_with_xpath(field_name, rule[6:].strip(), content)
+        else:
+            logger.warning(f"未知的规则格式: {rule}，必须以 'css:' 或 'xpath:' 开头")
             return None
     
-    def _extract_regex_from_rule(self, rule: str) -> Optional[str]:
+    def _extract_with_css(self, field_name: str, selector: str, html_content: str) -> Optional[str]:
         """
-        从提取规则中提取正则表达式
+        使用CSS选择器从HTML中提取内容
         
         Args:
-            rule: 提取规则字符串
+            field_name: 字段名
+            selector: CSS选择器
+            html_content: HTML内容
             
         Returns:
-            正则表达式字符串，如果提取失败返回None
+            提取的值，如果提取失败返回None
         """
-        # 查找冒号后的正则表达式
-        if "：" in rule:
-            return rule.split("：", 1)[1].strip()
-        elif ":" in rule:
-            return rule.split(":", 1)[1].strip()
-        else:
-            # 如果没有冒号，假设整个规则就是正则表达式
-            return rule.strip()
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # 处理特殊的属性提取语法：selector::attr(attribute_name)
+            if '::attr(' in selector:
+                base_selector, attr_part = selector.split('::attr(', 1)
+                attr_name = attr_part.rstrip(')')
+                element = soup.select_one(base_selector.strip())
+                if element and element.has_attr(attr_name):
+                    result = element[attr_name]
+                    logger.info(f"字段 {field_name} CSS属性提取成功: {result}")
+                    return result
+                else:
+                    logger.warning(f"字段 {field_name} CSS选择器 {base_selector} 未找到元素或属性 {attr_name}")
+                    return None
+            
+            # 处理特殊的文本提取语法：selector::text
+            elif selector.endswith('::text'):
+                base_selector = selector[:-6].strip()
+                element = soup.select_one(base_selector)
+                if element:
+                    result = element.get_text(strip=True)
+                    logger.info(f"字段 {field_name} CSS文本提取成功: {result}")
+                    return result
+                else:
+                    logger.warning(f"字段 {field_name} CSS选择器 {base_selector} 未找到元素")
+                    return None
+            
+            # 默认行为：提取元素的文本内容
+            else:
+                element = soup.select_one(selector)
+                if element:
+                    result = element.get_text(strip=True)
+                    logger.info(f"字段 {field_name} CSS文本提取成功: {result}")
+                    return result
+                else:
+                    logger.warning(f"字段 {field_name} CSS选择器 {selector} 未找到元素")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"CSS选择器提取出错 {selector}: {e}")
+            return None
+    
+    def _extract_with_xpath(self, field_name: str, xpath: str, html_content: str) -> Optional[str]:
+        """
+        使用XPath从HTML中提取内容
+        
+        Args:
+            field_name: 字段名
+            xpath: XPath表达式
+            html_content: HTML内容
+            
+        Returns:
+            提取的值，如果提取失败返回None
+        """
+        try:
+            tree = lxml_html.fromstring(html_content)
+            elements = tree.xpath(xpath)
+            
+            if elements:
+                # 取第一个匹配结果
+                element = elements[0]
+                
+                if isinstance(element, str):
+                    # XPath直接返回字符串（如属性值或文本）
+                    result = element.strip()
+                    logger.info(f"字段 {field_name} XPath字符串提取成功: {result}")
+                    return result
+                else:
+                    # XPath返回元素，提取文本内容
+                    result = element.text_content().strip()
+                    logger.info(f"字段 {field_name} XPath元素提取成功: {result}")
+                    return result
+            else:
+                logger.warning(f"字段 {field_name} XPath {xpath} 未找到匹配元素")
+                return None
+                
+        except Exception as e:
+            logger.error(f"XPath提取出错 {xpath}: {e}")
+            return None
     
     def _extract_current_time(self, rule: str) -> str:
         """
@@ -162,39 +220,12 @@ class ContentParser:
             logger.error(f"时间提取错误: {e}")
             return datetime.now().strftime('%Y-%m-%d %H:%M')
 
-    def _clean_html_residue(self, text: str) -> str:
-        """
-        兜底清理：移除明显的HTML标签残留，但保留链接信息
-
-        Args:
-            text: 待清理的文本
-
-        Returns:
-            清理后的文本
-        """
-        if not text:
-            return text
-
-        # 先将<a>标签转换为Markdown格式
-        text = re.sub(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', r'[\2](\1)', text)
-
-        # 移除其他HTML标签
-        text = re.sub(r'<[^>]+>', '', text)
-
-        # 移除HTML实体
-        text = re.sub(r'&[a-zA-Z0-9#]+;', '', text)
-
-        # 清理多余的空白字符
-        text = re.sub(r'\s+', ' ', text).strip()
-
-        return text
-
 # 全局解析器实例
-_content_parser: Optional[ContentParser] = None
+_content_parser: Optional[HTMLContentParser] = None
 
-def get_content_parser() -> ContentParser:
-    """获取内容解析器实例"""
+def get_content_parser() -> HTMLContentParser:
+    """获取HTML内容解析器实例"""
     global _content_parser
     if _content_parser is None:
-        _content_parser = ContentParser()
+        _content_parser = HTMLContentParser()
     return _content_parser

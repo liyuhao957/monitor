@@ -70,36 +70,14 @@ def _should_send_notification(task_name: str, content: str) -> bool:
     task_cache[content_hash] = current_time
     return True
 
-def _normalize_text(text: str) -> str:
-    """Standardize text by decoding HTML entities, and unifying whitespace."""
-    text = html.unescape(text)  # Decode HTML entities like &amp;
-    text = re.sub(r'<[^>]+>', '', text)  # Strip HTML tags
-    text = re.sub(r'\s+', ' ', text).strip()  # Replace multiple whitespace chars with a single space
-    return text
-
-def _normalize_text_preserve_links(text: str) -> str:
-    """Standardize text while preserving important HTML tags like links."""
-    text = html.unescape(text)  # Decode HTML entities like &amp;
-
-    # 保留链接标签，移除其他HTML标签
-    # 先保护链接标签
-    text = re.sub(r'<a\s+([^>]*?)>', r'<a \1>', text)  # 标准化链接标签格式
-
-    # 移除除了链接之外的其他HTML标签
-    text = re.sub(r'<(?!/?a\b)[^>]+>', '', text)
-
-    # 统一空白字符
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
-
 async def _extract_content(html_content: str, rule: str) -> str:
-    """Extracts content from HTML based on the provided rule (css, xpath, or regex)."""
+    """Extracts HTML content based on the provided rule (css, xpath, or regex), preserving HTML structure."""
     try:
         if rule.startswith('css:'):
             selector = rule[4:].strip()
             tree = lxml_html.fromstring(html_content)
             elements = tree.cssselect(selector)
-            return "\n".join([_normalize_text(el.text_content()) for el in elements])
+            return "\n".join([lxml_html.tostring(el, encoding='unicode', method='html') for el in elements])
         elif rule.startswith('xpath:'):
             expression = rule[6:].strip()
             tree = lxml_html.fromstring(html_content)
@@ -108,32 +86,23 @@ async def _extract_content(html_content: str, rule: str) -> str:
             result_parts = []
             for el in elements:
                 if isinstance(el, str):
-                    # XPath返回的字符串（如属性值）
-                    result_parts.append(_normalize_text(el))
+                    # XPath返回的字符串（如属性值），直接使用
+                    result_parts.append(el)
                 else:
-                    # XPath返回的元素，检查是否包含链接
-                    element_html = lxml_html.tostring(el, encoding='unicode')
-                    if '<a ' in element_html:
-                        # 包含链接，保留HTML结构
-                        result_parts.append(_normalize_text_preserve_links(element_html))
-                    else:
-                        # 不包含链接，正常处理
-                        result_parts.append(_normalize_text(el.text_content()))
+                    # XPath返回的元素，保留HTML结构
+                    result_parts.append(lxml_html.tostring(el, encoding='unicode', method='html'))
             return "\n".join(result_parts)
         elif rule.startswith('regex:'):
             pattern = rule[6:].strip()
-            # For regex, we search against the raw HTML, not normalized text
+            # For regex, we search against the raw HTML
             matches = re.findall(pattern, html_content, re.DOTALL)
-            # We still normalize the final extracted strings
-            return "\n".join([_normalize_text(match) for match in matches])
+            return "\n".join(matches)
         else:
-            logger.warning(f"Unknown rule format: {rule}. Returning full page text.")
-            tree = lxml_html.fromstring(html_content)
-            return _normalize_text(tree.text_content())
+            logger.warning(f"Unknown rule format: {rule}. Returning full page HTML.")
+            return html_content
     except etree.ParserError as e:
-        logger.error(f"Failed to parse HTML content: {e}. Falling back to regex on raw text.")
-        # Fallback for broken HTML that lxml can't parse
-        return _normalize_text(html_content)
+        logger.error(f"Failed to parse HTML content: {e}. Returning raw content.")
+        return html_content
 
 async def fetch_page_content(task: Task) -> str:
     """仅获取页面内容，用于AI模板预览，不执行完整监控流程"""
