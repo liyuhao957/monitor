@@ -168,9 +168,24 @@ async def get_saved_ai_template(request: GetSavedAITemplateRequest):
                     logger.info(f"从存储数据提取了 {len(extracted_data)} 个字段")
             except Exception as e:
                 logger.warning(f"无法读取存储数据: {e}")
-            
+
+            # 处理多规则分段内容（无提取规则的情况）
+            if not extracted_data and not task.ai_extraction_rules:
+                # 多规则分段内容，直接传递存储的页面内容
+                try:
+                    stored_content = get_last_result(task.name)
+                    if stored_content:
+                        extracted_data['page_content'] = stored_content
+                        logger.info(f"多规则分段内容，直接传递存储内容作为page_content，长度: {len(stored_content)}")
+                    else:
+                        logger.warning("无法读取存储内容，使用空的page_content")
+                        extracted_data['page_content'] = ""
+                except Exception as e:
+                    logger.warning(f"读取存储内容失败: {e}")
+                    extracted_data['page_content'] = ""
+
             # 如果没有成功提取到数据，使用智能生成的示例数据
-            if not extracted_data and task.ai_extraction_rules:
+            elif not extracted_data and task.ai_extraction_rules:
                 logger.info("使用智能生成的示例数据")
                 for field in task.ai_extraction_rules:
                     field_lower = field.lower()

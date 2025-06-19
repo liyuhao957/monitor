@@ -198,11 +198,11 @@ async def _run_task_internal(task: Task):
                 for i, rule in enumerate(task.rules):
                     rule_content = await _extract_content(html_content, rule)
                     if rule_content:
-                        all_content.append(f"=== 规则 {i+1}: {rule} ===\n{rule_content}")
+                        all_content.append(f"=== 提取规则 {i+1}: {rule} ===\n{rule_content}")
                         logger.info(f"[{task.name}] Rule {i+1} extracted {len(rule_content)} characters")
                     else:
                         logger.warning(f"[{task.name}] Rule {i+1} extracted no content: {rule}")
-                        all_content.append(f"=== 规则 {i+1}: {rule} ===\n[无内容]")
+                        all_content.append(f"=== 提取规则 {i+1}: {rule} ===\n[无内容]")
                 
                 new_content = "\n\n".join(all_content)
                 logger.info(f"[{task.name}] Combined content from {len(task.rules)} rules: {len(new_content)} characters")
@@ -319,7 +319,13 @@ async def _run_task_internal(task: Task):
                                         ai_extracted_data[field_name] = template_context[field_name]
                                 logger.info(f"[{task.name}] Prepared AI data with {len(ai_extracted_data)} fields: {list(ai_extracted_data.keys())}")
                             else:
-                                logger.warning(f"[{task.name}] No AI extraction rules found, using empty data")
+                                # 多规则分段内容（无提取规则），直接传递页面内容
+                                task_rules = task.rules or [task.rule] if task.rule else []
+                                if len(task_rules) > 1:
+                                    ai_extracted_data['page_content'] = new_content
+                                    logger.info(f"[{task.name}] Multi-rule segmented content, passing page_content with {len(new_content)} characters")
+                                else:
+                                    logger.warning(f"[{task.name}] No AI extraction rules found, using empty data")
 
                             message = execute_notification_formatter(
                                 task.ai_formatter_code,
