@@ -49,7 +49,7 @@ tasks:
   frequency: 1m
   rule: xpath://*[@id="main"]/ul[1]
   rules: null
-  enabled: true
+  enabled: false
   screenshot: false
   notification_title: OPPO快游戏
   notification: null
